@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>English Match - Học từ vựng theo list</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --line: #e3e6ee;
+      --text: #243047;
+      --muted: #6d778b;
+      --accent: #e85e43;
+      --accent-soft: #fff3ef;
+      --blue: #3569d4;
+      --blue-soft: #eef4ff;
+      --green: #24a865;
+      --green-soft: #dff7e9;
+      --red: #df4b4b;
+      --red-soft: #ffe2e2;
+      --shadow: 0 10px 28px rgba(36, 48, 71, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { width: min(1180px, calc(100% - 28px)); margin: 26px auto 44px; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 16px 18px; box-shadow: var(--shadow);
+    }
+    .brand { min-width: 0; }
+    .brand h1 { margin: 0; font-size: clamp(20px, 3vw, 30px); letter-spacing: -.03em; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab {
+      border: 1px solid var(--line); background: #fff; color: var(--text);
+      padding: 10px 14px; border-radius: 12px; font-weight: 700;
+    }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .view { margin-top: 18px; }
+    .hidden { display: none !important; }
+
+    .game-shell { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; align-items: start; }
+    .game-panel, .side-panel, .vocab-panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+    }
+    .game-panel { padding: 18px; }
+    .game-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+    .game-title-wrap { min-width: 220px; }
+    .game-title-wrap strong { display: block; margin-bottom: 7px; }
+    .select-label { display: block; font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 5px; }
+    .select, .input {
+      width: 100%; min-height: 44px; border: 1px solid #cfd5df; border-radius: 11px; padding: 10px 12px;
+      outline: none; color: var(--text); background: #fff;
+    }
+    .select:focus, .input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53,105,212,.12); }
+    .game-select { min-width: 260px; }
+    .game-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .status-line { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-bottom: 13px; }
+    .pill { padding: 7px 10px; border-radius: 999px; background: #f2f4f8; color: var(--muted); font-size: 13px; font-weight: 700; }
+    .pill.primary { background: var(--blue-soft); color: #2f5db3; }
+    .progress-track { height: 8px; background: #edf0f4; border-radius: 99px; overflow: hidden; margin-bottom: 16px; }
+    .progress-bar { height: 100%; width: 0%; background: var(--green); transition: width .25s ease; }
+    .board {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid var(--line); border-left: 1px solid var(--line);
+      min-height: 480px;
+    }
+    .card {
+      min-height: 116px; padding: 12px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      background: #fff; color: var(--text); display: flex; align-items: center; justify-content: center;
+      text-align: center; line-height: 1.22; position: relative;
+      transition: background .16s ease, color .16s ease, opacity .28s ease, transform .12s ease;
+      overflow-wrap: anywhere;
+    }
+    .card:hover { background: #fafbfe; }
+    .card:focus-visible { outline: 3px solid rgba(53,105,212,.35); outline-offset: -3px; z-index: 2; }
+    .card.selected { box-shadow: inset 0 0 0 3px var(--blue); background: var(--blue-soft); }
+    .card.english { color: var(--accent); font-weight: 800; font-size: 17px; }
+    .card.vietnamese { color: #3d536f; font-size: 14px; }
+    .card.correct { background: var(--green-soft); color: #147f49; box-shadow: inset 0 0 0 3px var(--green); }
+    .card.wrong { background: var(--red-soft); color: #b32d2d; box-shadow: inset 0 0 0 3px var(--red); animation: shake .22s linear 2; }
+    .card.matched { opacity: 0; transform: scale(.92); pointer-events: none; }
+    @keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
+    .empty-board { min-height: 360px; display: grid; place-items: center; padding: 30px; color: var(--muted); text-align: center; grid-column: 1/-1; }
+    .complete-box {
+      min-height: 360px; grid-column: 1/-1; display: grid; place-items: center; padding: 28px; text-align: center;
+      background: linear-gradient(180deg, #fff, #fbfffd);
+    }
+    .complete-box h3 { margin: 0 0 8px; color: #147f49; font-size: 24px; }
+    .complete-box p { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
+
+    .side-panel { padding: 16px; }
+    .side-panel h2 { margin: 0 0 12px; font-size: 16px; }
+    .stat { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+    .stat:last-of-type { border-bottom: 0; }
+    .stat b { color: var(--text); text-align: right; }
+    .notice { margin-top: 14px; padding: 11px 12px; border-radius: 12px; background: var(--accent-soft); color: #8b4939; font-size: 13px; line-height: 1.45; }
+    .notice.blue { background: var(--blue-soft); color: #345899; }
+    .btn {
+      border: 0; border-radius: 12px; padding: 10px 13px; font-weight: 800; min-height: 42px;
+      background: var(--accent); color: #fff;
+    }
+    .btn.secondary { background: #edf1f7; color: var(--text); }
+    .btn.blue { background: var(--blue); color: #fff; }
+    .btn.danger { background: #fff0f0; color: #b63131; border: 1px solid #ffd0d0; }
+    .btn:disabled { cursor: not-allowed; opacity: .5; }
+    .side-actions { display: grid; gap: 8px; margin-top: 14px; }
+
+    .vocab-panel { padding: 18px; }
+    .manage-grid { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 22px; }
+    .left-column { padding-right: 22px; border-right: 1px solid var(--line); }
+    .section-title { margin: 0 0 6px; font-size: 20px; }
+    .section-sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; line-height: 1.45; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+    .form-msg { min-height: 22px; margin-top: 10px; font-size: 13px; font-weight: 700; }
+    .form-msg.ok { color: var(--green); }
+    .form-msg.err { color: var(--red); }
+    .divider { height: 1px; background: var(--line); margin: 22px 0; }
+
+    .list-manager { display: grid; gap: 8px; margin-top: 12px; }
+    .list-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+      border: 1px solid var(--line); border-radius: 11px; padding: 9px 10px;
+    }
+    .list-row strong { overflow-wrap: anywhere; }
+    .count-badge { font-size: 12px; font-weight: 800; color: var(--muted); background: #f2f4f8; border-radius: 999px; padding: 5px 8px; }
+    .icon-btn { border: 0; border-radius: 9px; padding: 7px 9px; font-weight: 800; min-height: 34px; }
+    .icon-btn.delete { color: #b63131; background: #fff0f0; }
+
+    .list-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; width: min(100%, 520px); }
+    .filters .input, .filters .select { flex: 1 1 180px; }
+    .vocab-list { display: grid; gap: 8px; max-height: 650px; overflow: auto; padding-right: 4px; }
+    .vocab-row {
+      display: grid; grid-template-columns: minmax(120px, .9fr) minmax(160px, 1.25fr) minmax(135px, .8fr) auto;
+      gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 11px;
+    }
+    .word-en { color: var(--accent); font-weight: 850; overflow-wrap: anywhere; }
+    .word-vi { color: #465870; overflow-wrap: anywhere; }
+    .row-list-select { min-height: 38px; padding: 7px 9px; }
+    .delete-btn { border: 0; background: #fff0f0; color: #b63131; border-radius: 9px; padding: 8px 10px; font-weight: 800; }
+    .small-muted { color: var(--muted); font-size: 13px; }
+    .toast {
+      position: fixed; right: 18px; bottom: 18px; max-width: min(360px, calc(100% - 36px));
+      background: #243047; color: white; border-radius: 12px; padding: 12px 14px; font-size: 14px;
+      opacity: 0; transform: translateY(12px); pointer-events: none; transition: .2s ease; z-index: 20;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 920px) {
+      .game-shell { grid-template-columns: 1fr; }
+      .side-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+      .side-panel h2, .notice, .side-actions { grid-column: 1 / -1; }
+      .manage-grid { grid-template-columns: 1fr; }
+      .left-column { border-right: 0; border-bottom: 1px solid var(--line); padding-right: 0; padding-bottom: 22px; }
+    }
+    @media (max-width: 680px) {
+      .app { width: min(100% - 16px, 1180px); margin-top: 8px; }
+      .topbar { align-items: flex-start; flex-direction: column; border-radius: 14px; }
+      .tabs { width: 100%; }
+      .tab { flex: 1; }
+      .game-panel, .side-panel, .vocab-panel { border-radius: 14px; }
+      .game-panel { padding: 10px; }
+      .game-head { align-items: stretch; }
+      .game-title-wrap, .game-select { width: 100%; min-width: 0; }
+      .game-actions { width: 100%; }
+      .game-actions .btn { flex: 1; }
+      .board { grid-template-columns: repeat(2, minmax(0, 1fr)); min-height: 0; }
+      .card { min-height: 96px; }
+      .vocab-row { grid-template-columns: 1fr auto; }
+      .word-vi, .row-list-wrap { grid-column: 1 / -1; }
+      .word-vi { grid-row: 2; }
+      .row-list-wrap { grid-row: 3; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>English Match</h1>
+        <p>Học theo từng list hoặc random toàn bộ — mỗi từ chỉ xuất hiện 1 lần trong một vòng học.</p>
+      </div>
+      <nav class="tabs" aria-label="Chức năng">
+        <button class="tab active" data-view="game" type="button">Học từ</button>
+        <button class="tab" data-view="vocab" type="button">Quản lý từ & list</button>
+      </nav>
+    </header>
+
+    <section id="gameView" class="view">
+      <div class="game-shell">
+        <section class="game-panel" aria-labelledby="gameTitle">
+          <div class="game-head">
+            <div class="game-title-wrap">
+              <strong id="gameTitle">Tìm cặp phù hợp</strong>
+              <label class="select-label" for="gameListSelect">Chọn phạm vi học</label>
+              <select id="gameListSelect" class="select game-select"></select>
+            </div>
+            <div class="game-actions">
+              <button class="btn secondary" id="reshuffleBtn" type="button">Trộn vị trí ô</button>
+              <button class="btn blue" id="newRoundBtn" type="button">↻ Vòng random mới</button>
+            </div>
+          </div>
+
+          <div class="status-line">
+            <span class="pill primary" id="scopeLabel">Tất cả list</span>
+            <span class="pill" id="pageLabel">Trang 0/0</span>
+            <span class="pill" id="pairLabel">0/0 cặp</span>
+            <span class="pill" id="roundLabel">0 từ trong vòng</span>
+          </div>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+          <div id="board" class="board" aria-live="polite"></div>
+        </section>
+
+        <aside class="side-panel">
+          <h2>Tiến độ</h2>
+          <div class="stat"><span>Tổng từ đã lưu</span><b id="totalStat">0</b></div>
+          <div class="stat"><span>Số list</span><b id="listStat">0</b></div>
+          <div class="stat"><span>Từ trong lựa chọn</span><b id="scopeCountStat">0</b></div>
+          <div class="stat"><span>Đúng trang này</span><b id="correctStat">0</b></div>
+          <div class="stat"><span>Sai trang này</span><b id="wrongStat">0</b></div>
+          <div class="notice blue">Trong một vòng học, hệ thống trộn danh sách đúng 1 lần rồi chia thành từng trang. Vì vậy các trang không lặp lại cùng một từ. Chọn “Tất cả list” để ôn toàn bộ kho từ.</div>
+          <div class="notice">Đúng: 2 ô xanh rồi biến mất. Sai: 2 ô đỏ rồi trở lại. Hoàn thành trang sẽ tự chuyển sang trang kế tiếp.</div>
+          <div class="side-actions">
+            <button class="btn secondary" id="prevBtn" type="button">← Trang trước</button>
+            <button class="btn" id="nextBtn" type="button">Trang sau →</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="vocabView" class="view hidden">
+      <section class="vocab-panel">
+        <div class="manage-grid">
+          <div class="left-column">
+            <h2 class="section-title">Tạo list từ vựng</h2>
+            <p class="section-sub">Ví dụ: List TOEIC 1, Unit 3, Travel, School... Mỗi từ được gắn vào một list.</p>
+            <form id="listForm">
+              <div class="field">
+                <label for="listNameInput">Tên list</label>
+                <input id="listNameInput" class="input" maxlength="80" autocomplete="off" placeholder="Ví dụ: TOEIC - Part 5" required>
+              </div>
+              <button class="btn blue" type="submit">+ Tạo list</button>
+              <div id="listFormMsg" class="form-msg" aria-live="polite"></div>
+            </form>
+            <div id="listManager" class="list-manager"></div>
+
+            <div class="divider"></div>
+
+            <h2 class="section-title">Thêm từ vựng mới</h2>
+            <p class="section-sub">Từ vẫn lưu trong SQLite database sau khi tắt web. Dữ liệu chỉ mất khi bạn chủ động xóa.</p>
+            <form id="addForm">
+              <div class="field">
+                <label for="englishInput">Từ tiếng Anh</label>
+                <input id="englishInput" class="input" maxlength="120" autocomplete="off" placeholder="Ví dụ: workshop" required>
+              </div>
+              <div class="field">
+                <label for="vietnameseInput">Nghĩa tiếng Việt</label>
+                <input id="vietnameseInput" class="input" maxlength="220" autocomplete="off" placeholder="Ví dụ: phân xưởng" required>
+              </div>
+              <div class="field">
+                <label for="addListSelect">Lưu vào list</label>
+                <select id="addListSelect" class="select" required></select>
+              </div>
+              <button class="btn" type="submit">+ Lưu từ mới</button>
+              <div id="formMsg" class="form-msg" aria-live="polite"></div>
+            </form>
+          </div>
+
+          <div>
+            <div class="list-head">
+              <div>
+                <h2 class="section-title">Kho từ vựng</h2>
+                <div class="small-muted" id="listCount">0 từ</div>
+              </div>
+              <div class="filters">
+                <select id="manageListFilter" class="select" aria-label="Lọc theo list"></select>
+                <input id="searchInput" class="input" placeholder="Tìm từ hoặc tên list..." autocomplete="off">
+              </div>
+            </div>
+            <div id="vocabList" class="vocab-list"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const PAGE_SIZE = 8;
+      const state = {
+        vocab: [],
+        lists: [],
+        activeListId: 'all',
+        sessionWords: [],
+        pages: [],
+        pageIndex: 0,
+        cards: [],
+        first: null,
+        second: null,
+        locked: false,
+        matched: new Set(),
+        correct: 0,
+        wrong: 0,
+        finished: false,
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const board = $('board');
+      const pageLabel = $('pageLabel');
+      const pairLabel = $('pairLabel');
+      const roundLabel = $('roundLabel');
+      const scopeLabel = $('scopeLabel');
+      const progressBar = $('progressBar');
+      const correctStat = $('correctStat');
+      const wrongStat = $('wrongStat');
+      const totalStat = $('totalStat');
+      const listStat = $('listStat');
+      const scopeCountStat = $('scopeCountStat');
+      const prevBtn = $('prevBtn');
+      const nextBtn = $('nextBtn');
+      const reshuffleBtn = $('reshuffleBtn');
+      const newRoundBtn = $('newRoundBtn');
+      const gameListSelect = $('gameListSelect');
+      const addListSelect = $('addListSelect');
+      const manageListFilter = $('manageListFilter');
+      const listManager = $('listManager');
+      const toast = $('toast');
+      const gameView = $('gameView');
+      const vocabView = $('vocabView');
+      const vocabList = $('vocabList');
+      const searchInput = $('searchInput');
+      const formMsg = $('formMsg');
+      const listFormMsg = $('listFormMsg');
+      let toastTimer = null;
+      let searchTimer = null;
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+      }
+
+      function shuffle(array) {
+        const a = [...array];
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      function chunk(array, size) {
+        const out = [];
+        for (let i = 0; i < array.length; i += size) out.push(array.slice(i, i + size));
+        return out;
+      }
+
+      async function api(url, options = {}) {
+        const res = await fetch(url, {
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+          ...options,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
+        return data;
+      }
+
+      function activeListName() {
+        if (state.activeListId === 'all') return 'Tất cả list · Random toàn bộ';
+        const list = state.lists.find(x => String(x.id) === String(state.activeListId));
+        return list ? list.name : 'List đã chọn';
+      }
+
+      function getScopeWords() {
+        if (state.activeListId === 'all') return [...state.vocab];
+        return state.vocab.filter(item => String(item.list_id) === String(state.activeListId));
+      }
+
+      function fillSelect(select, { includeAll = false, allLabel = 'Tất cả list' } = {}) {
+        const oldValue = select.value;
+        select.innerHTML = '';
+        if (includeAll) {
+          const opt = document.createElement('option');
+          opt.value = 'all';
+          opt.textContent = allLabel;
+          select.appendChild(opt);
+        }
+        for (const list of state.lists) {
+          const opt = document.createElement('option');
+          opt.value = String(list.id);
+          opt.textContent = `${list.name} (${list.word_count})`;
+          select.appendChild(opt);
+        }
+        if ([...select.options].some(o => o.value === oldValue)) select.value = oldValue;
+      }
+
+      function refreshSelectors() {
+        const currentGame = String(state.activeListId);
+        fillSelect(gameListSelect, { includeAll: true, allLabel: '🎲 Tất cả list · Random toàn bộ' });
+        fillSelect(manageListFilter, { includeAll: true, allLabel: 'Tất cả list' });
+        fillSelect(addListSelect);
+
+        if ([...gameListSelect.options].some(o => o.value === currentGame)) {
+          gameListSelect.value = currentGame;
+        } else {
+          state.activeListId = 'all';
+          gameListSelect.value = 'all';
+        }
+
+        if (!addListSelect.value && state.lists.length) addListSelect.value = String(state.lists[0].id);
+      }
+
+      async function loadData({ restartGame = true } = {}) {
+        const [listsData, vocabData] = await Promise.all([
+          api('/api/lists'),
+          api('/api/vocabulary'),
+        ]);
+        state.lists = listsData.items;
+        state.vocab = vocabData.items;
+        totalStat.textContent = vocabData.total;
+        listStat.textContent = listsData.total;
+        refreshSelectors();
+        renderListManager();
+        await runSearch();
+        if (restartGame) startNewRound();
+      }
+
+      function startNewRound() {
+        const pool = getScopeWords();
+        state.sessionWords = shuffle(pool);
+        state.pages = chunk(state.sessionWords, PAGE_SIZE);
+        state.pageIndex = 0;
+        state.finished = false;
+        scopeCountStat.textContent = pool.length;
+        scopeLabel.textContent = activeListName();
+        roundLabel.textContent = `${pool.length} từ trong vòng`;
+        startPage();
+      }
+
+      function startPage() {
+        state.first = null;
+        state.second = null;
+        state.locked = false;
+        state.matched = new Set();
+        state.correct = 0;
+        state.wrong = 0;
+        correctStat.textContent = '0';
+        wrongStat.textContent = '0';
+
+        if (!state.pages.length) {
+          board.innerHTML = '<div class="empty-board"><div><strong>List này chưa có từ vựng.</strong><br>Hãy vào “Quản lý từ & list” để thêm từ.</div></div>';
+          pageLabel.textContent = 'Trang 0/0';
+          pairLabel.textContent = '0/0 cặp';
+          progressBar.style.width = '0%';
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+          reshuffleBtn.disabled = true;
+          newRoundBtn.disabled = !state.vocab.length;
+          return;
+        }
+
+        reshuffleBtn.disabled = false;
+        newRoundBtn.disabled = false;
+        const pairs = state.pages[state.pageIndex];
+        state.cards = shuffle(pairs.flatMap((item) => [
+          { key: `${item.id}-en`, pairId: item.id, side: 'english', text: item.english },
+          { key: `${item.id}-vi`, pairId: item.id, side: 'vietnamese', text: item.vietnamese },
+        ]));
+        renderBoard();
+        updateStatus();
+      }
+
+      function renderBoard() {
+        board.innerHTML = '';
+        for (const item of state.cards) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `card ${item.side}`;
+          btn.dataset.key = item.key;
+          btn.dataset.pairId = item.pairId;
+          btn.dataset.side = item.side;
+          btn.textContent = item.text;
+          btn.setAttribute('aria-label', `${item.side === 'english' ? 'Tiếng Anh' : 'Tiếng Việt'}: ${item.text}`);
+          btn.addEventListener('click', () => chooseCard(btn));
+          board.appendChild(btn);
+        }
+      }
+
+      function chooseCard(card) {
+        if (state.locked || card.classList.contains('matched') || state.finished) return;
+        if (state.first === card) return;
+        card.classList.add('selected');
+        if (!state.first) {
+          state.first = card;
+          return;
+        }
+        state.second = card;
+        state.locked = true;
+        checkPair();
+      }
+
+      function checkPair() {
+        const a = state.first;
+        const b = state.second;
+        const samePair = a.dataset.pairId === b.dataset.pairId;
+        const differentSide = a.dataset.side !== b.dataset.side;
+
+        if (samePair && differentSide) {
+          a.classList.remove('selected');
+          b.classList.remove('selected');
+          a.classList.add('correct');
+          b.classList.add('correct');
+          state.correct += 1;
+          correctStat.textContent = state.correct;
+          state.matched.add(a.dataset.pairId);
+          updateStatus();
+          setTimeout(() => {
+            a.classList.add('matched');
+            b.classList.add('matched');
+            a.classList.remove('correct');
+            b.classList.remove('correct');
+            clearTurn();
+            const totalPairs = state.pages[state.pageIndex].length;
+            if (state.matched.size === totalPairs) setTimeout(goNextAfterComplete, 450);
+          }, 520);
+        } else {
+          a.classList.remove('selected');
+          b.classList.remove('selected');
+          a.classList.add('wrong');
+          b.classList.add('wrong');
+          state.wrong += 1;
+          wrongStat.textContent = state.wrong;
+          setTimeout(() => {
+            a.classList.remove('wrong');
+            b.classList.remove('wrong');
+            clearTurn();
+          }, 680);
+        }
+      }
+
+      function clearTurn() {
+        state.first = null;
+        state.second = null;
+        state.locked = false;
+      }
+
+      function updateStatus() {
+        const totalPairs = state.pages.length ? state.pages[state.pageIndex].length : 0;
+        pageLabel.textContent = `Trang ${state.pages.length ? state.pageIndex + 1 : 0}/${state.pages.length}`;
+        pairLabel.textContent = `${state.matched.size}/${totalPairs} cặp`;
+        progressBar.style.width = totalPairs ? `${Math.round(state.matched.size / totalPairs * 100)}%` : '0%';
+        prevBtn.disabled = state.pageIndex <= 0;
+        nextBtn.disabled = !state.pages.length || state.pageIndex >= state.pages.length - 1;
+      }
+
+      function goNextAfterComplete() {
+        if (state.pageIndex < state.pages.length - 1) {
+          state.pageIndex += 1;
+          startPage();
+          showToast('Hoàn thành trang. Đã chuyển sang trang kế tiếp — không lặp từ.');
+          return;
+        }
+
+        state.finished = true;
+        progressBar.style.width = '100%';
+        board.innerHTML = `
+          <div class="complete-box">
+            <div>
+              <h3>✓ Hoàn thành vòng học!</h3>
+              <p>Bạn đã đi hết ${state.sessionWords.length} từ trong <strong>${escapeHtml(activeListName())}</strong> mà không lặp từ.</p>
+              <button id="completeNewRoundBtn" class="btn blue" type="button">↻ Random vòng mới</button>
+            </div>
+          </div>`;
+        $('completeNewRoundBtn').addEventListener('click', () => {
+          startNewRound();
+          showToast('Đã tạo vòng random mới.');
+        });
+        pairLabel.textContent = `${state.pages[state.pageIndex].length}/${state.pages[state.pageIndex].length} cặp`;
+        prevBtn.disabled = state.pageIndex <= 0;
+        nextBtn.disabled = true;
+        reshuffleBtn.disabled = true;
+        showToast('Đã hoàn thành toàn bộ vòng học!');
+      }
+
+      function escapeHtml(text) {
+        return String(text).replace(/[&<>'"]/g, ch => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        })[ch]);
+      }
+
+      prevBtn.addEventListener('click', () => {
+        if (state.pageIndex > 0) {
+          state.finished = false;
+          state.pageIndex -= 1;
+          startPage();
+        }
+      });
+
+      nextBtn.addEventListener('click', () => {
+        if (state.pageIndex < state.pages.length - 1) {
+          state.finished = false;
+          state.pageIndex += 1;
+          startPage();
+        }
+      });
+
+      reshuffleBtn.addEventListener('click', () => {
+        if (!state.pages.length || state.finished) return;
+        state.cards = shuffle(state.cards);
+        renderBoard();
+        state.first = null;
+        state.second = null;
+        state.locked = false;
+        showToast('Đã trộn vị trí các ô. Bộ từ của trang không thay đổi.');
+      });
+
+      newRoundBtn.addEventListener('click', () => {
+        startNewRound();
+        showToast('Đã random một vòng mới.');
+      });
+
+      gameListSelect.addEventListener('change', () => {
+        state.activeListId = gameListSelect.value;
+        startNewRound();
+        showToast(state.activeListId === 'all' ? 'Đang random toàn bộ các list.' : `Đang học ${activeListName()}.`);
+      });
+
+      document.querySelectorAll('.tab').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const isGame = tab.dataset.view === 'game';
+          gameView.classList.toggle('hidden', !isGame);
+          vocabView.classList.toggle('hidden', isGame);
+        });
+      });
+
+      $('listForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        listFormMsg.className = 'form-msg';
+        listFormMsg.textContent = 'Đang tạo...';
+        const name = $('listNameInput').value.trim();
+        try {
+          const data = await api('/api/lists', {
+            method: 'POST',
+            body: JSON.stringify({ name }),
+          });
+          e.target.reset();
+          listFormMsg.className = 'form-msg ok';
+          listFormMsg.textContent = `Đã tạo “${data.item.name}”.`;
+          await loadData({ restartGame: true });
+          addListSelect.value = String(data.item.id);
+          showToast('Đã tạo list mới.');
+        } catch (err) {
+          listFormMsg.className = 'form-msg err';
+          listFormMsg.textContent = err.message;
+        }
+      });
+
+      $('addForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        formMsg.className = 'form-msg';
+        formMsg.textContent = 'Đang lưu...';
+        const english = $('englishInput').value.trim();
+        const vietnamese = $('vietnameseInput').value.trim();
+        const list_id = addListSelect.value;
+        try {
+          await api('/api/vocabulary', {
+            method: 'POST',
+            body: JSON.stringify({ english, vietnamese, list_id }),
+          });
+          e.target.reset();
+          addListSelect.value = list_id;
+          formMsg.className = 'form-msg ok';
+          formMsg.textContent = 'Đã lưu vào database.';
+          await loadData({ restartGame: true });
+          if ([...addListSelect.options].some(o => o.value === list_id)) addListSelect.value = list_id;
+          showToast('Đã thêm từ mới.');
+          $('englishInput').focus();
+        } catch (err) {
+          formMsg.className = 'form-msg err';
+          formMsg.textContent = err.message;
+        }
+      });
+
+      function renderListManager() {
+        listManager.innerHTML = '';
+        if (!state.lists.length) {
+          listManager.innerHTML = '<div class="small-muted">Chưa có list.</div>';
+          return;
+        }
+        for (const list of state.lists) {
+          const row = document.createElement('div');
+          row.className = 'list-row';
+          const name = document.createElement('strong');
+          name.textContent = list.name;
+          const count = document.createElement('span');
+          count.className = 'count-badge';
+          count.textContent = `${list.word_count} từ`;
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'icon-btn delete';
+          del.textContent = 'Xóa';
+          del.title = list.word_count ? 'Chỉ xóa được list rỗng' : 'Xóa list';
+          del.addEventListener('click', () => deleteList(list));
+          row.append(name, count, del);
+          listManager.appendChild(row);
+        }
+      }
+
+      function renderVocabList(items) {
+        $('listCount').textContent = `${items.length} từ`;
+        vocabList.innerHTML = '';
+        if (!items.length) {
+          vocabList.innerHTML = '<div class="small-muted">Không có từ phù hợp.</div>';
+          return;
+        }
+
+        for (const item of items) {
+          const row = document.createElement('div');
+          row.className = 'vocab-row';
+
+          const en = document.createElement('div');
+          en.className = 'word-en';
+          en.textContent = item.english;
+
+          const vi = document.createElement('div');
+          vi.className = 'word-vi';
+          vi.textContent = item.vietnamese;
+
+          const listWrap = document.createElement('div');
+          listWrap.className = 'row-list-wrap';
+          const listSelect = document.createElement('select');
+          listSelect.className = 'select row-list-select';
+          listSelect.setAttribute('aria-label', `List của từ ${item.english}`);
+          for (const list of state.lists) {
+            const opt = document.createElement('option');
+            opt.value = String(list.id);
+            opt.textContent = list.name;
+            listSelect.appendChild(opt);
+          }
+          listSelect.value = String(item.list_id);
+          listSelect.addEventListener('change', () => moveVocabulary(item, listSelect));
+          listWrap.appendChild(listSelect);
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'delete-btn';
+          del.textContent = 'Xóa';
+          del.addEventListener('click', () => deleteVocabulary(item));
+
+          row.append(en, vi, listWrap, del);
+          vocabList.appendChild(row);
+        }
+      }
+
+      async function moveVocabulary(item, select) {
+        const oldValue = String(item.list_id);
+        try {
+          await api(`/api/vocabulary/${item.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ list_id: select.value }),
+          });
+          await loadData({ restartGame: true });
+          showToast(`Đã chuyển “${item.english}” sang list mới.`);
+        } catch (err) {
+          select.value = oldValue;
+          showToast(err.message);
+        }
+      }
+
+      async function deleteVocabulary(item) {
+        const ok = confirm(`Xóa "${item.english}" khỏi database?`);
+        if (!ok) return;
+        try {
+          await api(`/api/vocabulary/${item.id}`, { method: 'DELETE' });
+          await loadData({ restartGame: true });
+          showToast('Đã xóa từ vựng.');
+        } catch (err) {
+          showToast(err.message);
+        }
+      }
+
+      async function deleteList(list) {
+        const ok = confirm(`Xóa list "${list.name}"?\n\nLưu ý: list chỉ xóa được khi không còn từ bên trong.`);
+        if (!ok) return;
+        try {
+          await api(`/api/lists/${list.id}`, { method: 'DELETE' });
+          if (String(state.activeListId) === String(list.id)) state.activeListId = 'all';
+          await loadData({ restartGame: true });
+          showToast('Đã xóa list.');
+        } catch (err) {
+          showToast(err.message);
+        }
+      }
+
+      async function runSearch() {
+        const q = searchInput.value.trim();
+        const listId = manageListFilter.value || 'all';
+        const params = new URLSearchParams();
+        if (q) params.set('search', q);
+        if (listId !== 'all') params.set('list_id', listId);
+        try {
+          const url = `/api/vocabulary${params.toString() ? `?${params.toString()}` : ''}`;
+          const data = await api(url);
+          renderVocabList(data.items);
+        } catch (err) {
+          showToast(err.message);
+        }
+      }
+
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(runSearch, 180);
+      });
+      manageListFilter.addEventListener('change', runSearch);
+
+      loadData().catch((err) => {
+        board.innerHTML = `<div class="empty-board">${escapeHtml(err.message)}<br>Hãy chắc chắn server.py đang chạy.</div>`;
+      });
+    })();
+  </script>
+</body>
+</html>
