@@ -1,7 +1,7 @@
 {
   "name": "english-match-desktop",
   "productName": "English Match",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "English Match — học từ vựng offline trên Windows và macOS",
   "author": "ducquang2111",
   "private": true,
@@ -20,20 +20,43 @@
     "appId": "com.englishmatch.desktop",
     "productName": "English Match",
     "asar": true,
-    "directories": {"output": "release", "buildResources": "assets"},
-    "files": ["electron/**/*", "package.json", "README.md"],
-    "extraResources": [{"from": "build/backend/english-match-backend", "to": "backend"}],
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json",
+      "README.md"
+    ],
+    "extraResources": [
+      {
+        "from": "build/backend/english-match-backend",
+        "to": "backend"
+      }
+    ],
     "artifactName": "English-Match-${version}-${os}-${arch}.${ext}",
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.education",
       "minimumSystemVersion": "13.0",
       "identity": "-",
       "hardenedRuntime": false,
       "icon": "assets/icon.png"
     },
-    "dmg": {"title": "English Match", "sign": false},
-    "win": {"target": ["nsis"], "icon": "assets/icon.ico"},
+    "dmg": {
+      "title": "English Match",
+      "sign": false
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,

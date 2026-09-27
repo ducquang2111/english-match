@@ -19,4 +19,4 @@ with tempfile.TemporaryDirectory(prefix='English Match native ') as folder:
         env = {**os.environ, 'EM_SMOKE_DATA':folder, 'EM_SMOKE_OUTPUT':str(ROOT/'test-results'), 'EM_SMOKE_STAGE':stage}
         subprocess.run([str(executable),'--smoke-test'], env=env, timeout=90, check=True)
         assert (ROOT/'test-results'/f'{stage}.json').is_file(), 'Application exited without completing the smoke test'
-print('PACKAGED_NATIVE_APP_OK: both launches, matching, saving, isolated renderer')
+print('PACKAGED_NATIVE_APP_OK: both launches, matching, flashcards, typing, wrong-word review, history, saving, isolated renderer')

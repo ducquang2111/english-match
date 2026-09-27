@@ -45,7 +45,7 @@
   }
   function queueSave() {
     if (!state.databaseId) return;
-    if (state.session) state.session.updatedAt = Date.now();
+    if (state.session) state.session.updatedAt = Math.max(Date.now(), state.session.updatedAt + 1);
     const payload = { database_id: state.databaseId, item: state.session ? JSON.parse(JSON.stringify(state.session)) : null };
     try { localStorage.setItem(CACHE, JSON.stringify(payload)); } catch { /* SQLite is still used. */ }
     state.pending = payload; saveLabel('Đang lưu...'); drainSaves();
@@ -55,7 +55,7 @@
     state.saving = (async () => {
       while (state.pending !== undefined) {
         const payload = state.pending; state.pending = undefined;
-        try { await api('/api/progress', json('PUT', payload)); state.saveError = null; }
+        try { await api('/api/progress', json('PUT', payload)); state.saveError = null; window.dispatchEvent(new Event('learning-updated')); }
         catch (error) {
           if (state.pending === undefined) state.pending = payload;
           state.saveError = error; saveLabel('Chưa lưu vào database', true); break;
@@ -69,7 +69,7 @@
     await drainSaves();
     if (state.pending !== undefined || state.saveError) throw state.saveError || new Error('Tiến độ chưa được lưu. Hãy thử lại.');
   }
-  window.EnglishMatchDesktop = Object.freeze({ flush: flushSaves });
+  window.EnglishMatchDesktop = Object.freeze({ async flush() { await flushSaves(); await window.Study?.flush(); } });
   $('retrySaveBtn').addEventListener('click', () => { saveLabel('Đang thử lưu...'); drainSaves(); });
   window.addEventListener('beforeunload', event => {
     if (state.pending !== undefined || state.saving) { event.preventDefault(); event.returnValue = ''; }
@@ -95,6 +95,7 @@
     else {
       const pages = makePages(words);
       state.session = { version: 1, scope: state.scope, words, pages, pageIndex: 0, updatedAt: Date.now(),
+        learning: { id: crypto.randomUUID(), startedAt: Date.now(), scopeName: scopeName(), events: [] },
         pageStates: pages.map(ids => ({ matched: [], wrong: 0, wrongIds: [], order: shuffle(ids.flatMap(id => [`${id}-en`, `${id}-vi`])) })) };
     }
     renderGame(); queueSave();
@@ -166,6 +167,8 @@
     a.classList.add(correct ? 'correct' : 'wrong'); b.classList.add(correct ? 'correct' : 'wrong');
     if (correct) { if (!p.matched.includes(id)) p.matched.push(id); }
     else { p.wrong++; for (const x of [id, Number(b.dataset.pairId)]) if (!p.wrongIds.includes(x)) p.wrongIds.push(x); }
+    if (!state.session.learning) state.session.learning = { id: crypto.randomUUID(), startedAt: Date.now(), scopeName: scopeName() + ' (tiếp tục vòng cũ)', events: [] };
+    state.session.learning.events.push({ correct, wordIds: [...new Set([id, Number(b.dataset.pairId)])], at: Date.now() });
     updateStatus(); queueSave();
     later(() => {
       state.first = null; state.locked = false; renderGame();
@@ -185,6 +188,10 @@
     return !state.session || allDone() || (completedCount() === 0 && !state.session.pageStates.some(p => p.wrong)) || confirm('Vòng mới sẽ thay thế tiến độ vòng đang học. Bạn muốn tiếp tục?');
   }
   function requestNewRound() { if (state.ready && !state.restoreBusy && approveReset()) { createRound(); toast('Đã tạo vòng mới từ kho từ hiện tại.'); } }
+  $('matchSpeakBtn').addEventListener('click', () => {
+    const word = state.session?.words.find(w => w.id === Number(state.first?.dataset.pairId));
+    if (word) window.Study?.speak(word.english); else toast('Chọn một ô từ rồi bấm nghe phát âm.');
+  });
   $('newRoundBtn').addEventListener('click', requestNewRound);
   $('prevBtn').addEventListener('click', () => goPage(state.session.pageIndex - 1));
   $('nextBtn').addEventListener('click', () => goPage(state.session.pageIndex + 1));
@@ -257,12 +264,13 @@
       });
       wrap.append(select);
       const actions = document.createElement('div'); actions.className = 'row-actions';
-      actions.append(actionButton('Sửa', 'icon-btn', () => {
+      actions.append(actionButton('🔊', 'icon-btn', () => window.Study?.speak(w.english)), actionButton('Sửa', 'icon-btn', () => {
         editId = w.id; $('editEnglish').value = w.english; $('editVietnamese').value = w.vietnamese;
         $('editListSelect').value = String(w.list_id); message('editMessage', ''); $('editDialog').showModal();
       }), actionButton('Xóa', 'delete-btn', () => {
         if (confirm(`Xóa “${w.english}” khỏi kho từ?`)) perform(async () => { await api(`/api/vocabulary/${w.id}`, { method: 'DELETE' }); await refreshData(); toast('Đã xóa từ.'); });
       }));
+      actions.firstElementChild.setAttribute('aria-label', `Nghe phát âm ${w.english}`);
       row.append(en, vi, wrap, actions); $('vocabList').append(row);
     }
   }
@@ -274,11 +282,12 @@
     if (state.session && !roundCompatible(state.session)) { createRound(); toast('Một từ trong vòng đã được sửa, chuyển hoặc xóa. Đã tạo vòng mới.'); }
     else if (!state.session && pool().length) createRound();
     else { renderGame(); if (state.session) queueSave(); }
+    window.dispatchEvent(new Event('vocab-updated'));
   }
   document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
     if (state.restoreBusy) return;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
-    ['game', 'vocab', 'data'].forEach(view => $(`${view}View`).classList.toggle('hidden', view !== tab.dataset.view));
+    ['game', 'review', 'history', 'vocab', 'data'].forEach(view => $(`${view}View`).classList.toggle('hidden', view !== tab.dataset.view));
   }));
   $('searchInput').addEventListener('input', renderVocab); $('manageListFilter').addEventListener('change', renderVocab);
   $('cancelEditBtn').addEventListener('click', () => $('editDialog').close());
@@ -348,36 +357,36 @@
     message('importMessage', `Đã nhập ${report.new} từ; bỏ qua ${report.duplicates} cặp trùng. Từ mới sẽ có trong vòng tiếp theo.`);
   }, 'importMessage', e.currentTarget).finally(() => { $('applyImportBtn').disabled = true; }));
   $('downloadBackupBtn').addEventListener('click', e => perform(async () => {
-    cancelEffects(); renderGame(); await flushSaves();
+    cancelEffects(); renderGame(); await flushSaves(); await window.Study?.flush();
     const response = await fetch('/api/backup'); if (!response.ok) throw new Error('Không tải được bản sao lưu.');
     const blob = await response.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = `english-match-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000); toast('Đã tải bản sao lưu kho từ và tiến độ.');
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000); toast('Đã tải bản sao lưu kho từ, tiến độ và lịch sử.');
   }, 'restoreMessage', e.currentTarget));
   $('restoreFile').addEventListener('change', () => { restorePreview = null; $('applyRestoreBtn').classList.add('hidden'); message('restoreMessage', ''); });
   $('previewRestoreBtn').addEventListener('click', e => perform(async () => {
     restorePreview = null; $('applyRestoreBtn').classList.add('hidden');
     const file = $('restoreFile').files[0]; if (!file) throw new Error('Hãy chọn file sao lưu JSON.');
-    if (file.size > 30 * 1024 * 1024) throw new Error('File sao lưu tối đa 30 MB.');
+    if (file.size > 60 * 1024 * 1024) throw new Error('File sao lưu tối đa 60 MB.');
     let backup; try { backup = JSON.parse(await file.text()); } catch { throw new Error('File JSON không hợp lệ.'); }
     const result = await api('/api/restore/preview', json('POST', { backup }));
     if ($('restoreFile').files[0] !== file) return;
     restorePreview = { backup, token: result.token };
-    message('restoreMessage', `${result.lists} list · ${result.words} từ · ${result.has_progress ? 'Có' : 'Không có'} tiến độ. Khôi phục thay thế dữ liệu hiện tại.`);
+    message('restoreMessage', `${result.lists} list · ${result.words} từ · ${result.has_progress ? 'Có' : 'Không có'} tiến độ ghép cặp · ${result.history_count} buổi trong lịch sử. Khôi phục thay thế dữ liệu hiện tại.`);
     $('applyRestoreBtn').classList.remove('hidden');
   }, 'restoreMessage', e.currentTarget));
   $('applyRestoreBtn').addEventListener('click', async () => {
-    if (!restorePreview || state.restoreBusy || !confirm('Thay thế toàn bộ kho từ và tiến độ bằng bản đã chọn? Một bản database dự phòng sẽ được tạo trước khi thay thế.')) return;
-    state.restoreBusy = true; $('applyRestoreBtn').disabled = true;
+    if (!restorePreview || state.restoreBusy || !confirm('Thay thế toàn bộ kho từ, tiến độ và lịch sử bằng bản đã chọn? Một bản database dự phòng sẽ được tạo trước khi thay thế.')) return;
+    state.restoreBusy = true; window.Study?.setBusy(true); $('applyRestoreBtn').disabled = true;
     try {
-      cancelEffects(); await flushSaves();
+      cancelEffects(); await flushSaves(); await window.Study?.flush();
       const result = await api('/api/restore', json('POST', restorePreview));
       try { localStorage.removeItem(CACHE); } catch {}
       state.session = null; state.pending = undefined; state.saveError = null;
-      await initialize(false); restorePreview = null; $('applyRestoreBtn').classList.add('hidden');
+      await initialize(false); await window.Study?.reload(false); restorePreview = null; $('applyRestoreBtn').classList.add('hidden');
       message('restoreMessage', `Đã khôi phục. Bản dự phòng: backups/${result.safety_backup}`);
     } catch (e) { message('restoreMessage', e.message, true); }
-    finally { state.restoreBusy = false; $('applyRestoreBtn').disabled = false; }
+    finally { state.restoreBusy = false; window.Study?.setBusy(false); $('applyRestoreBtn').disabled = false; }
   });
   async function initialize(useCache = true) {
     const [lists, words, progress] = await Promise.all([api('/api/lists'), api('/api/vocabulary'), api('/api/progress')]);
@@ -395,6 +404,6 @@
   }
   initialize().catch(e => {
     saveLabel('Không kết nối được', true);
-    boardMessage('Chưa kết nối được máy chủ', `${e.message} Hãy chạy python3 server.py rồi tải lại trang.`);
+    boardMessage('Chưa kết nối được máy chủ', `${e.message} Hãy thoát rồi mở lại English Match.`);
   });
 })();

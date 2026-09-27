@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>English Match 2.1 - Học từ vựng</title>
+  <title>English Match 2.2 - Học từ vựng</title>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -210,6 +210,43 @@
     @media(max-width:1000px) { .manage-grid { grid-template-columns:1fr; } .left-column { border-right:0; padding-right:0; } }
     @media(max-width:760px) { .data-grid { grid-template-columns:1fr; } }
     @media(max-width:680px) { .vocab-row { grid-template-columns:1fr auto; } .row-actions { grid-column:2; grid-row:1; } }
+    .topbar { flex-direction:column; align-items:stretch; }
+    .review-layout { display:grid; grid-template-columns:minmax(0,1fr) 270px; gap:18px; align-items:start; }
+    .review-controls { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .review-controls .field { margin:0; }
+    .review-options { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:16px 0; }
+    .review-options label { display:flex; align-items:center; gap:8px; }
+    input[type=checkbox] { width:18px; height:18px; accent-color:var(--blue); }
+    .study-card { width:100%; border:1px solid #c8d6ed; border-radius:18px; background:linear-gradient(135deg,#f4f8ff,#fff); min-height:260px; padding:28px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; color:var(--text); text-align:center; overflow-wrap:anywhere; }
+    button.study-card:hover { border-color:var(--blue); }
+    .study-card .main-word { font-size:clamp(25px,4vw,38px); line-height:1.25; font-weight:800; }
+    .study-card .translation { font-size:22px; line-height:1.45; }
+    .study-actions { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin:16px 0; }
+    .study-actions .btn { min-width:140px; }
+    .answer-form { max-width:560px; margin:20px auto 0; }
+    .answer-feedback { padding:14px; border-radius:12px; margin:12px 0; line-height:1.6; overflow-wrap:anywhere; }
+    .answer-feedback.good { background:var(--green-soft); color:#14683c; }
+    .answer-feedback.bad { background:var(--red-soft); color:#a22727; }
+    .review-sidebar { display:block; }
+    .stats-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .metric { border:1px solid var(--line); border-radius:14px; padding:18px; background:#f8faff; }
+    .metric strong { display:block; font-size:30px; margin-bottom:5px; color:#2f5db3; }
+    .metric span { font-size:13px; color:var(--muted); }
+    .history-table { overflow:auto; margin:14px 0; }
+    .history-table table { min-width:640px; }
+    .history-table .btn { min-height:32px; padding:6px 9px; font-size:12px; }
+    .history-table th { white-space:nowrap; }
+    .history-table td { max-width:280px; }
+    .section-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+    .section-toolbar .select { width:auto; max-width:100%; }
+    .pagination { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
+    #sessionDialog { width:min(850px,calc(100% - 28px)); }
+    #sessionDialog .history-table { max-height:55vh; }
+    .week-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; margin:16px 0; }
+    .day-cell { padding:12px 4px; text-align:center; border-radius:10px; background:#f4f6fa; font-size:12px; }
+    .day-cell b { display:block; font-size:21px; margin-top:6px; }
+    @media(max-width:920px) { .review-layout { grid-template-columns:1fr; } }
+    @media(max-width:680px) { .stats-grid { grid-template-columns:1fr 1fr; } .tab { flex:1 1 42%; padding:10px 8px; font-size:13px; } .review-controls { grid-template-columns:1fr; } .study-card { min-height:225px; padding:20px; } .review-layout .game-panel { padding:16px; } .week-grid { gap:3px; } .day-cell { padding:10px 1px; font-size:10px; } .metric { padding:12px; } }
   </style>
 </head>
 <body>
@@ -217,10 +254,12 @@
     <header class="topbar">
       <div class="brand">
         <h1>English Match</h1>
-        <p>Học theo list · Lưu tiến độ · Tiếp tục bất cứ lúc nào</p>
+        <p>Ghép cặp · Ghi nhớ · Luyện gõ · Theo dõi tiến bộ</p>
       </div>
       <nav class="tabs" aria-label="Chức năng">
-        <button class="tab active" data-view="game" type="button">Học từ</button>
+        <button class="tab active" data-view="game" type="button">Ghép cặp</button>
+        <button class="tab" data-view="review" type="button">Ôn tập</button>
+        <button class="tab" data-view="history" type="button">Lịch sử & thống kê</button>
         <button class="tab" data-view="vocab" type="button">Quản lý từ & list</button><button class="tab" data-view="data" type="button">Nhập & sao lưu</button>
       </nav>
     </header>
@@ -235,6 +274,7 @@
               <select id="gameListSelect" class="select game-select"></select>
             </div>
             <div class="game-actions">
+              <button class="btn secondary" id="matchSpeakBtn" type="button">🔊 Nghe từ đã chọn</button>
               <button class="btn secondary" id="reshuffleBtn" type="button">Trộn vị trí ô</button>
               <button class="btn blue" id="newRoundBtn" type="button">↻ Vòng random mới</button>
             </div>
@@ -265,6 +305,59 @@
           </div>
         </aside>
       </div>
+    </section>
+
+
+    <section id="reviewView" class="view hidden">
+      <div class="review-layout">
+        <section class="game-panel" aria-labelledby="reviewTitle">
+          <h2 class="section-title" id="reviewTitle">Ôn tập từ vựng</h2>
+          <p class="section-sub">Lật thẻ để ghi nhớ, sau đó luyện gõ để kiểm tra chính tả.</p>
+          <div class="review-controls">
+            <div class="field"><label for="reviewMode">Cách học</label><select class="select" id="reviewMode"><option value="flashcard">Flashcard — tự đánh giá</option><option value="typing">Gõ đáp án tiếng Anh</option></select></div>
+            <div class="field"><label for="reviewScope">Phạm vi</label><select class="select" id="reviewScope"><option value="all">Tất cả list</option></select></div>
+          </div>
+          <div class="review-options"><label><input type="checkbox" id="reviewWrongOnly">Chỉ ôn từ sai / chưa nhớ</label><button class="btn blue" id="startReviewBtn" type="button" disabled>Bắt đầu buổi mới</button></div>
+          <div class="status-line"><span class="pill primary" id="reviewCounter">Chưa có buổi ôn</span><span class="pill" id="reviewSave" role="status">Đang tải...</span><button class="text-btn hidden" id="retryReviewSave" type="button">Thử lưu lại</button></div>
+          <p id="reviewMessage" class="form-msg" role="status"></p>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="reviewProgressBar"></div></div>
+          <div id="studyArea"><div class="study-card"><span class="main-word">Mỗi ngày, nhớ thêm một chút</span><span class="small-muted">Chọn cách học và bấm “Bắt đầu buổi mới”.</span></div></div>
+        </section>
+        <aside class="side-panel review-sidebar">
+          <h2>Nghe phát âm</h2>
+          <div class="field"><label for="voiceSelect">Giọng tiếng Anh</label><select id="voiceSelect" class="select"></select></div>
+          <div class="field"><label for="speechRate">Tốc độ đọc</label><select id="speechRate" class="select"><option value="0.7">Chậm · 0,7×</option><option value="0.85" selected>Vừa · 0,85×</option><option value="1">Bình thường · 1×</option></select></div>
+          <p id="speechStatus" class="help" role="status"></p>
+          <div class="notice blue">Flashcard: lật thẻ trước khi chọn “Đã nhớ” hoặc “Chưa nhớ”. Bài gõ: xem nghĩa tiếng Việt và nhập từ tiếng Anh.</div>
+          <div class="notice">Từ trả lời sai sẽ vào danh sách cần ôn. Gõ đúng hoặc đánh dấu “Đã nhớ” để đưa từ ra khỏi danh sách.</div>
+          <p class="help">Thay đổi lựa chọn ở trên chỉ áp dụng khi bắt đầu buổi mới. Tiến độ được lưu sau mỗi câu.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="historyView" class="view hidden">
+      <section class="vocab-panel">
+        <div class="section-toolbar"><div><h2 class="section-title">Lịch sử & thống kê</h2><p class="section-sub">Theo dõi kết quả từ các buổi học đã lưu.</p></div><div class="row-actions"><button class="btn secondary" id="refreshHistoryBtn" type="button">Làm mới</button><button class="btn blue" id="reviewMistakesBtn" type="button">Ôn từ sai</button></div></div>
+        <div id="historyMessage" class="form-msg" role="status"></div>
+        <div class="stats-grid">
+          <div class="metric"><strong id="completedMetric">—</strong><span>Buổi đã hoàn thành</span></div>
+          <div class="metric"><strong id="practicedMetric">—</strong><span>Từ trong kho đã luyện</span></div>
+          <div class="metric"><strong id="accuracyMetric">—</strong><span>Đúng khi ghép cặp / gõ</span></div>
+          <div class="metric"><strong id="wrongMetric">—</strong><span>Từ đang cần ôn</span></div>
+        </div>
+        <p id="statsDetail" class="help"></p>
+        <h3>7 ngày gần đây</h3><p class="help">Số lượt trả lời, tính theo ngày bắt đầu buổi học. Bao gồm tự đánh giá Flashcard.</p><div id="weekStats" class="week-grid"></div>
+        <div class="divider"></div>
+        <div class="section-toolbar"><h3>Lịch sử buổi học</h3><select id="historyMode" class="select" aria-label="Lọc chế độ học"><option value="all">Tất cả chế độ</option><option value="match">Ghép cặp</option><option value="flashcard">Flashcard</option><option value="typing">Gõ đáp án</option></select></div>
+        <div id="historyTable" class="history-table"></div>
+        <div class="pagination"><button class="btn secondary" id="historyPrev" type="button">← Trước</button><span class="small-muted" id="historyPage"></span><button class="btn secondary" id="historyNext" type="button">Sau →</button></div>
+        <div class="divider"></div>
+        <h3>Kết quả theo từ</h3>
+        <div class="filters"><input id="wordStatsSearch" class="input" placeholder="Tìm từ hoặc nghĩa..." aria-label="Tìm trong thống kê"><select id="wordStatsFilter" class="select" aria-label="Lọc kết quả theo từ"><option value="all">Tất cả từ</option><option value="wrong">Đang cần ôn</option><option value="practiced">Đã luyện</option></select></div>
+        <p class="help">Đúng / sai là kết quả ghép cặp và gõ. Nhớ / chưa nhớ là tự đánh giá Flashcard. Lịch sử vẫn giữ kết quả cũ khi bạn sửa hoặc xóa từ.</p>
+        <div id="wordStatsTable" class="history-table"></div>
+        <div class="pagination"><button class="btn secondary" id="wordStatsPrev" type="button">← Trước</button><span class="small-muted" id="wordStatsPage"></span><button class="btn secondary" id="wordStatsNext" type="button">Sau →</button></div>
+      </section>
     </section>
 
     <section id="vocabView" class="view hidden">
@@ -348,7 +441,7 @@
         </section>
         <section aria-labelledby="backupTitle">
           <h2 class="section-title" id="backupTitle">Sao lưu & khôi phục</h2>
-          <p class="section-sub">Một file JSON chứa toàn bộ list, từ vựng và vòng học đang lưu.</p>
+          <p class="section-sub">Một file JSON chứa list, từ vựng, tiến độ ghép cặp, tiến độ ôn tập và toàn bộ lịch sử kết quả.</p>
           <button type="button" id="downloadBackupBtn" class="btn blue full-width">↓ Tải bản sao lưu</button>
           <div class="divider"></div>
           <div class="field"><label for="restoreFile">Chọn bản sao lưu JSON</label><input id="restoreFile" type="file" accept=".json,application/json" class="input"></div>
@@ -383,6 +476,8 @@
       <div class="dialog-actions"><button id="cancelRenameBtn" class="btn secondary" type="button">Hủy</button><button class="btn" type="submit">Lưu tên</button></div>
     </form>
   </dialog>
+  <dialog id="sessionDialog" aria-labelledby="sessionTitle"><h2 id="sessionTitle">Chi tiết buổi học</h2><p id="sessionSummary" class="help"></p><div id="sessionEvents" class="history-table"></div><div class="dialog-actions"><button class="btn secondary" type="button" id="closeSessionBtn">Đóng</button></div></dialog>
   <script src="/app.js" defer></script>
+  <script src="/review.js" defer></script>
 </body>
 </html>

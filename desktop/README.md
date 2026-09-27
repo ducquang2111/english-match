@@ -1,20 +1,26 @@
 # English Match — ứng dụng Windows và macOS
 
-Chuyển từ đúng file `english-match-web-v2(2)(1).zip` được cung cấp ngày 27/09/2026. Giữ giao diện, 16 từ và List 1, ghép cặp, random không lặp, quản lý từ/list, nhập CSV, lưu vòng học, xuất và khôi phục JSON. Đây là các chức năng trong ZIP; ZIP chưa chứa flashcard hoặc tài khoản online.
+Chuyển từ đúng file `english-match-web-v2(2)(2).zip` được cung cấp ngày 27/09/2026. Giữ giao diện, 16 từ và List 1, ghép cặp, random không lặp, quản lý từ/list, nhập CSV, lưu vòng học, xuất và khôi phục JSON. Bản 1.1.0 bổ sung đầy đủ tính năng của ZIP mới: flashcard, gõ đáp án, phát âm, ôn từ sai, lịch sử và thống kê.
 
 ## Cài và mở
 
 | Máy | File |
 | --- | --- |
-| Windows 10/11, 64-bit Intel/AMD | `English-Match-1.0.0-win-x64.exe` |
-| Mac chip Apple Silicon (M1, M2, M3, M4…); macOS 13 trở lên | `English-Match-1.0.0-mac-arm64.dmg` |
-| Mac chip Intel; macOS 13 trở lên | `English-Match-1.0.0-mac-x64.dmg` |
+| Windows 10/11, 64-bit Intel/AMD | `English-Match-1.1.0-win-x64.exe` |
+| Mac chip Apple Silicon (M1, M2, M3, M4…); macOS 13 trở lên | `English-Match-1.1.0-mac-arm64.dmg` |
+| Mac chip Intel; macOS 13 trở lên | `English-Match-1.1.0-mac-x64.dmg` |
 
 Windows: mở bộ cài, chọn thư mục và hoàn tất. Sau đó mở biểu tượng **English Match** ở Desktop hoặc Start Menu.
 
 Mac: mở DMG, kéo **English Match** vào **Applications**, rồi mở trong Applications. Chọn đúng loại chip tại menu Apple → About This Mac.
 
 Không cần cài Python, Node.js, trình duyệt hoặc thuê máy chủ. Học được khi tắt mạng. Bộ cài miễn phí chưa có chứng chỉ nhà phát hành thương mại / Apple notarization, nên hệ điều hành có thể hiển thị cảnh báo khi mở lần đầu. Hãy kiểm tra đúng nguồn tải; nếu máy do công ty quản lý chặn cài đặt, liên hệ quản trị viên. Không cần tắt bảo vệ của hệ điều hành.
+
+## Cập nhật từ 1.0.0
+
+Thoát ứng dụng cũ, chạy bộ cài 1.1.0 (Mac: thay ứng dụng trong Applications). Dữ liệu vẫn ở cùng thư mục trên máy. Bản mới tự thêm cấu trúc lưu ôn tập, giữ kho từ và vòng ghép cặp cũ. Hãy xuất JSON trước khi cập nhật. JSON cũ vẫn nhập được; JSON mới có cả lịch sử và tiến độ ôn tập.
+
+Phát âm sử dụng giọng tiếng Anh được cài trên hệ điều hành. Nếu chưa có giọng, ứng dụng hướng dẫn cài giọng trong Windows/macOS. Chọn giọng cài trên máy để nghe khi offline.
 
 ## Dữ liệu và sao lưu
 

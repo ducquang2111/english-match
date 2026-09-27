@@ -27,6 +27,7 @@ def initialize(data_dir):
                 con.executemany('INSERT INTO vocabulary_lists(id,name,created_at) VALUES(:id,:name,:created_at)', clean['lists'])
                 con.executemany('INSERT INTO vocabulary(id,english,vietnamese,list_id,created_at) VALUES(:id,:english,:vietnamese,:list_id,:created_at)', clean['vocabulary'])
                 con.execute("INSERT OR REPLACE INTO app_meta(key,value) VALUES('progress',?)", (json.dumps(clean['progress'], ensure_ascii=False),))
+                web.restore_learning(con, clean['learning'])
             os.replace(web.DB_PATH, destination)
         finally:
             web.DB_PATH = destination

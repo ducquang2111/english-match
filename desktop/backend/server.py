@@ -11,6 +11,7 @@ import io
 import hashlib
 import threading
 import uuid
+import unicodedata
 from functools import wraps
 from datetime import datetime, timezone
 
@@ -130,6 +131,7 @@ def init_db():
             )
             con.execute("INSERT OR REPLACE INTO app_meta(key, value) VALUES('seeded', '1')")
 
+        init_learning(con)
         con.commit()
 
 
@@ -434,7 +436,7 @@ class LegacyHandler(BaseHTTPRequestHandler):
 
 # Phase 1: persistent rounds, bulk import, backup and restore.
 WRITE_LOCK = threading.RLock()
-MAX_BODY = 32 * 1024 * 1024
+MAX_BODY = 64 * 1024 * 1024
 
 
 def serialized(fn):
@@ -502,16 +504,16 @@ def ascii_lower(s):
 
 
 def export_backup(con):
-    return {'format': 'english-match-backup', 'version': 1,
+    return {'format': 'english-match-backup', 'version': 2,
             'exported_at': datetime.now(timezone.utc).isoformat(),
             'lists': [dict(r) for r in con.execute('SELECT * FROM vocabulary_lists ORDER BY id')],
             'vocabulary': [dict(r) for r in con.execute('SELECT * FROM vocabulary ORDER BY id')],
-            'progress': get_progress(con)}
+            'progress': get_progress(con), 'learning': learning_export(con)}
 
 
 def validate_backup(raw):
-    if not isinstance(raw, dict) or raw.get('format') != 'english-match-backup' or raw.get('version') != 1:
-        raise ValueError('Hãy chọn file JSON được xuất từ English Match đợt 1.')
+    if not isinstance(raw, dict) or raw.get('format') != 'english-match-backup' or raw.get('version') not in (1, 2):
+        raise ValueError('Hãy chọn file JSON được xuất từ English Match đợt 1 hoặc đợt 2.')
     lists, words = raw.get('lists'), raw.get('vocabulary')
     if not isinstance(lists, list) or not isinstance(words, list) or len(lists) > 10000 or len(words) > 10000:
         raise ValueError('Cấu trúc hoặc số lượng dữ liệu không hợp lệ (tối đa 10.000 từ).')
@@ -538,7 +540,10 @@ def validate_backup(raw):
         clean_words.append({'id': r['id'], 'english': en, 'vietnamese': vi, 'list_id': r['list_id'], 'created_at': str(r.get('created_at', ''))[:100]})
     progress = raw.get('progress')
     validate_progress(progress)
-    return {'lists': clean_lists, 'vocabulary': clean_words, 'progress': progress}
+    match_learning(progress)
+    if raw['version']==2 and not isinstance(raw.get('learning'),dict):
+        raise ValueError('Bản sao lưu thiếu dữ liệu học tập.')
+    return {'lists': clean_lists, 'vocabulary': clean_words, 'progress': progress, 'learning': validate_learning_backup(raw.get('learning'))}
 
 
 def backup_token(data):
@@ -614,8 +619,234 @@ def prepare_import(con, data):
             'errors': sum(r['status']=='error' for r in rows), 'duplicates': sum(r['status']=='duplicate' for r in rows)}
 
 
+# Phase 2 learning records. Snapshots retain history when vocabulary is edited/deleted.
+def init_learning(con):
+    con.execute('''CREATE TABLE IF NOT EXISTS learning_sessions (
+        id TEXT PRIMARY KEY, mode TEXT NOT NULL, scope_name TEXT NOT NULL,
+        started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, status TEXT NOT NULL,
+        total INTEGER NOT NULL, correct INTEGER NOT NULL, wrong INTEGER NOT NULL)''')
+    con.execute('''CREATE TABLE IF NOT EXISTS learning_events (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE,
+        session_id TEXT NOT NULL, mode TEXT NOT NULL, word_id INTEGER NOT NULL,
+        english TEXT NOT NULL, vietnamese TEXT NOT NULL, correct INTEGER NOT NULL,
+        answer TEXT NOT NULL, occurred_at INTEGER NOT NULL)''')
+    con.execute('CREATE INDEX IF NOT EXISTS learning_word_idx ON learning_events(word_id,seq)')
+    con.execute('CREATE INDEX IF NOT EXISTS learning_session_idx ON learning_events(session_id,seq)')
+
+
+def clean_answer(value):
+    text = unicodedata.normalize('NFKC', value).translate(str.maketrans({'’': "'", '‘': "'", 'ʼ': "'"}))
+    return re.sub(r'\s+', ' ', text.strip()).lower()
+
+
+def require_learning(ok, message='Dữ liệu học tập không hợp lệ.'):
+    if not ok:
+        raise ValueError(message)
+
+
+def valid_key(value):
+    return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_-]{8,80}', value) is not None
+
+
+def timestamp(value):
+    return type(value) is int and 0 <= value < 2**53
+
+
+def review_progress(con):
+    row = con.execute("SELECT value FROM app_meta WHERE key='review_progress'").fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def validate_review(s):
+    if s is None:
+        return
+    require_learning(isinstance(s, dict) and s.get('version') == 1 and valid_key(s.get('id')))
+    require_learning(s.get('mode') in ('flashcard','typing'))
+    require_learning(isinstance(s.get('scope'),str) and (s['scope']=='all' or s['scope'].isdigit()))
+    require_learning(isinstance(s.get('scopeName'),str) and len(s['scopeName']) <= 200)
+    require_learning(timestamp(s.get('startedAt')) and timestamp(s.get('updatedAt')))
+    require_learning(type(s.get('wrongOnly')) is bool and type(s.get('flipped')) is bool)
+    words, results = s.get('words'), s.get('results')
+    require_learning(isinstance(words,list) and 0 < len(words) <= 10000 and isinstance(results,list) and len(results)<=len(words))
+    require_learning(type(s.get('index')) is int and 0 <= s['index'] <= len(words))
+    require_learning(len(results) in (s['index'],s['index']+1))
+    ids=set()
+    for w in words:
+        require_learning(isinstance(w,dict) and positive_id(w.get('id')) and w['id'] not in ids and positive_id(w.get('list_id')))
+        require_learning(bool(normalize_text(w.get('english'),120)) and bool(normalize_text(w.get('vietnamese'),220)))
+        ids.add(w['id'])
+    for i,r in enumerate(results):
+        require_learning(isinstance(r,dict) and type(r.get('correct')) is bool and timestamp(r.get('at')))
+        require_learning(isinstance(r.get('answer'),str) and len(r['answer'])<=1000)
+        if s['mode']=='typing':
+            require_learning(r['correct']==(clean_answer(r['answer'])==clean_answer(words[i]['english'])), 'Kết quả bài gõ không khớp đáp án.')
+
+
+def match_learning(s):
+    if s is None or 'learning' not in s:
+        return None, []
+    l=s['learning']
+    require_learning(isinstance(l,dict) and valid_key(l.get('id')) and timestamp(l.get('startedAt')))
+    require_learning(isinstance(l.get('scopeName'),str) and len(l['scopeName'])<=200)
+    events=l.get('events')
+    require_learning(isinstance(events,list) and len(events)<=100000)
+    words={w['id']:w for w in s['words']}; records=[]
+    for i,e in enumerate(events):
+        require_learning(isinstance(e,dict) and type(e.get('correct')) is bool and timestamp(e.get('at')))
+        ids=e.get('wordIds')
+        require_learning(isinstance(ids,list) and 1<=len(ids)<=2 and all(positive_id(x) and x in words for x in ids) and len(set(ids))==len(ids))
+        for wid in ids:
+            w=words[wid]
+            records.append({'event_id':f'{l["id"]}:{i}:{wid}', 'session_id':l['id'], 'mode':'match', 'word_id':wid,
+                            'english':w['english'],'vietnamese':w['vietnamese'],'correct':int(e['correct']),'answer':'','occurred_at':e['at']})
+    correct=sum(e['correct'] for e in events); wrong=len(events)-correct
+    complete=sum(len(p['matched']) for p in s['pageStates'])==len(words)
+    meta={'id':l['id'],'mode':'match','scope_name':l['scopeName'],'started_at':l['startedAt'],'updated_at':s['updatedAt'],
+          'status':'completed' if complete else 'active','total':len(words),'correct':correct,'wrong':wrong}
+    return meta,records
+
+
+def review_learning(s):
+    if s is None:
+        return None,[]
+    correct=sum(r['correct'] for r in s['results']); records=[]
+    for i,r in enumerate(s['results']):
+        w=s['words'][i]
+        records.append({'event_id':f'{s["id"]}:{i}', 'session_id':s['id'], 'mode':s['mode'], 'word_id':w['id'],
+                        'english':w['english'],'vietnamese':w['vietnamese'],'correct':int(r['correct']),'answer':r['answer'],'occurred_at':r['at']})
+    meta={'id':s['id'],'mode':s['mode'],'scope_name':s['scopeName']+(' · Từ cần ôn' if s['wrongOnly'] else ''),
+          'started_at':s['startedAt'],'updated_at':s['updatedAt'],'status':'completed' if len(s['results'])==len(s['words']) else 'active',
+          'total':len(s['words']),'correct':correct,'wrong':len(s['results'])-correct}
+    return meta,records
+
+
+def sync_learning(con, meta, records, old_id=None):
+    if old_id and (meta is None or old_id!=meta['id']):
+        con.execute("UPDATE learning_sessions SET status='stopped' WHERE id=? AND status='active'",(old_id,))
+    if meta is None:
+        return
+    existing=con.execute('SELECT * FROM learning_sessions WHERE id=?',(meta['id'],)).fetchone()
+    if existing:
+        require_learning(existing['mode']==meta['mode'] and existing['started_at']==meta['started_at'], 'Mã buổi học đã được sử dụng.')
+        require_learning(meta['correct']>=existing['correct'] and meta['wrong']>=existing['wrong'], 'Không thể ghi đè kết quả mới bằng tiến độ cũ. Hãy tải lại trang.')
+        require_learning(meta['updated_at']>=existing['updated_at'], 'Tiến độ này cũ hơn dữ liệu đã lưu. Hãy tải lại trang.')
+    prior_ids={r[0] for r in con.execute('SELECT event_id FROM learning_events WHERE session_id=?',(meta['id'],))}
+    require_learning(prior_ids.issubset({r['event_id'] for r in records}), 'Tiến độ thiếu câu trả lời đã lưu. Hãy tải lại trang.')
+    con.execute('''INSERT INTO learning_sessions(id,mode,scope_name,started_at,updated_at,status,total,correct,wrong)
+        VALUES(:id,:mode,:scope_name,:started_at,:updated_at,:status,:total,:correct,:wrong)
+        ON CONFLICT(id) DO UPDATE SET scope_name=excluded.scope_name,updated_at=excluded.updated_at,
+        status=excluded.status,total=excluded.total,correct=excluded.correct,wrong=excluded.wrong''',meta)
+    for r in records:
+        old=con.execute('SELECT * FROM learning_events WHERE event_id=?',(r['event_id'],)).fetchone()
+        if old:
+            require_learning(all(old[k]==v for k,v in r.items()), 'Một câu trả lời đã lưu không được thay đổi.')
+            continue
+        con.execute('''INSERT INTO learning_events(event_id,session_id,mode,word_id,english,vietnamese,correct,answer,occurred_at)
+            VALUES(:event_id,:session_id,:mode,:word_id,:english,:vietnamese,:correct,:answer,:occurred_at)''',r)
+
+
+def word_learning(con):
+    rows=con.execute('''SELECT v.id,v.english,v.vietnamese,v.list_id,l.name AS list_name,
+        COUNT(e.seq) AS reviews,
+        SUM(CASE WHEN e.mode!='flashcard' AND e.correct=1 THEN 1 ELSE 0 END) AS correct_count,
+        SUM(CASE WHEN e.mode!='flashcard' AND e.correct=0 THEN 1 ELSE 0 END) AS wrong_count,
+        SUM(CASE WHEN e.mode='flashcard' AND e.correct=1 THEN 1 ELSE 0 END) AS remembered,
+        SUM(CASE WHEN e.mode='flashcard' AND e.correct=0 THEN 1 ELSE 0 END) AS forgotten,
+        MAX(e.occurred_at) AS last_reviewed,
+        CASE WHEN COALESCE(MAX(CASE WHEN e.correct=0 THEN e.seq END),0) >
+             COALESCE(MAX(CASE WHEN e.correct=1 AND e.mode IN ('typing','flashcard') THEN e.seq END),0)
+             THEN 1 ELSE 0 END AS needs_review
+        FROM vocabulary v JOIN vocabulary_lists l ON l.id=v.list_id
+        LEFT JOIN learning_events e ON e.word_id=v.id AND e.english=v.english COLLATE BINARY AND e.vietnamese=v.vietnamese
+        GROUP BY v.id ORDER BY needs_review DESC, wrong_count+forgotten DESC,v.id''').fetchall()
+    return [dict(r) for r in rows]
+
+
+def learning_export(con):
+    return {'review_progress':review_progress(con),
+            'sessions':[dict(r) for r in con.execute('SELECT * FROM learning_sessions ORDER BY started_at,id')],
+            'events':[dict(r) for r in con.execute('SELECT * FROM learning_events ORDER BY seq')]}
+
+
+def validate_learning_backup(raw):
+    if raw is None:
+        return {'review_progress':None,'sessions':[],'events':[]}
+    require_learning(isinstance(raw,dict) and isinstance(raw.get('sessions'),list) and isinstance(raw.get('events'),list))
+    validate_review(raw.get('review_progress'))
+    sessions=[];events=[];ids=set();keys=set();seqs=set()
+    for s in raw['sessions']:
+        require_learning(isinstance(s,dict) and valid_key(s.get('id')) and s['id'] not in ids)
+        require_learning(s.get('mode') in ('match','typing','flashcard') and s.get('status') in ('active','stopped','completed'))
+        require_learning(isinstance(s.get('scope_name'),str) and len(s['scope_name'])<=250)
+        require_learning(timestamp(s.get('started_at')) and timestamp(s.get('updated_at')))
+        require_learning(all(type(s.get(k)) is int and 0<=s[k]<=1000000 for k in ('total','correct','wrong')))
+        require_learning(s['total']<=10000 and s['correct']<=s['total'])
+        ids.add(s['id']); sessions.append({k:s[k] for k in ('id','mode','scope_name','started_at','updated_at','status','total','correct','wrong')})
+    session_modes={s['id']:s['mode'] for s in sessions}
+    for e in raw['events']:
+        require_learning(isinstance(e,dict) and positive_id(e.get('seq')) and e['seq'] not in seqs)
+        require_learning(isinstance(e.get('event_id'),str) and len(e['event_id'])<=150 and e['event_id'] not in keys and e.get('session_id') in ids)
+        require_learning(e.get('mode') in ('match','typing','flashcard') and positive_id(e.get('word_id')) and type(e.get('correct')) is int and e['correct'] in (0,1))
+        require_learning(e['mode']==session_modes[e['session_id']], 'Chế độ của kết quả không khớp buổi học.')
+        require_learning(bool(normalize_text(e.get('english'),120)) and bool(normalize_text(e.get('vietnamese'),220)))
+        require_learning(isinstance(e.get('answer'),str) and len(e['answer'])<=1000 and timestamp(e.get('occurred_at')))
+        seqs.add(e['seq']);keys.add(e['event_id'])
+        events.append({k:e[k] for k in ('seq','event_id','session_id','mode','word_id','english','vietnamese','correct','answer','occurred_at')})
+    return {'review_progress':raw.get('review_progress'),'sessions':sessions,'events':sorted(events,key=lambda e:e['seq'])}
+
+
+def restore_learning(con,data):
+    con.execute('DELETE FROM learning_events');con.execute('DELETE FROM learning_sessions')
+    con.executemany('''INSERT INTO learning_sessions(id,mode,scope_name,started_at,updated_at,status,total,correct,wrong)
+        VALUES(:id,:mode,:scope_name,:started_at,:updated_at,:status,:total,:correct,:wrong)''',data['sessions'])
+    con.executemany('''INSERT INTO learning_events(seq,event_id,session_id,mode,word_id,english,vietnamese,correct,answer,occurred_at)
+        VALUES(:seq,:event_id,:session_id,:mode,:word_id,:english,:vietnamese,:correct,:answer,:occurred_at)''',data['events'])
+    con.execute("INSERT OR REPLACE INTO app_meta(key,value) VALUES('review_progress',?)",(json.dumps(data['review_progress'],ensure_ascii=False),))
+
+
+def learning_get(handler,path,query):
+    if path=='/api/review/progress':
+        with db_connect() as con:
+            handler.send_json({'database_id':database_id(con),'item':review_progress(con)})
+        return True
+    if path=='/api/learning/stats':
+        with db_connect() as con:
+            words=word_learning(con)
+            totals=dict(con.execute('''SELECT COUNT(*) AS sessions,
+                COALESCE(SUM(status='completed'),0) AS completed,
+                COALESCE(SUM(CASE WHEN mode!='flashcard' THEN correct ELSE 0 END),0) AS correct,
+                COALESCE(SUM(CASE WHEN mode!='flashcard' THEN wrong ELSE 0 END),0) AS wrong,
+                COALESCE(SUM(CASE WHEN mode='flashcard' THEN correct ELSE 0 END),0) AS remembered,
+                COALESCE(SUM(CASE WHEN mode='flashcard' THEN wrong ELSE 0 END),0) AS forgotten
+                FROM learning_sessions''').fetchone())
+            totals['words_practiced']=sum(w['reviews']>0 for w in words);totals['needs_review']=sum(w['needs_review'] for w in words)
+            recent=[dict(r) for r in con.execute('SELECT started_at,mode,correct,wrong FROM learning_sessions WHERE started_at>=? ORDER BY started_at', (int(datetime.now(timezone.utc).timestamp()*1000)-8*86400000,))]
+        handler.send_json({'totals':totals,'words':words,'recent':recent})
+        return True
+    if path=='/api/learning/history':
+        try:
+            offset=max(0,int(query.get('offset',['0'])[0]));limit=min(100,max(1,int(query.get('limit',['20'])[0])))
+        except ValueError:
+            handler.send_json({'error':'Phân trang không hợp lệ.'},400);return True
+        mode=query.get('mode',['all'])[0]
+        if mode not in ('all','match','typing','flashcard'):
+            handler.send_json({'error':'Chế độ không hợp lệ.'},400);return True
+        where='' if mode=='all' else ' WHERE mode=?';params=[] if mode=='all' else [mode]
+        with db_connect() as con:
+            total=con.execute('SELECT COUNT(*) FROM learning_sessions'+where,params).fetchone()[0]
+            rows=con.execute('SELECT * FROM learning_sessions'+where+' ORDER BY started_at DESC,id DESC LIMIT ? OFFSET ?',params+[limit,offset]).fetchall()
+        handler.send_json({'items':[dict(r) for r in rows],'total':total,'offset':offset,'limit':limit});return True
+    match=re.fullmatch(r'/api/learning/session/([A-Za-z0-9_-]{8,80})',path)
+    if match:
+        with db_connect() as con:
+            s=con.execute('SELECT * FROM learning_sessions WHERE id=?',(match.group(1),)).fetchone()
+            rows=con.execute('SELECT * FROM learning_events WHERE session_id=? ORDER BY seq',(match.group(1),)).fetchall()
+        handler.send_json({'item':dict(s),'events':[dict(r) for r in rows]} if s else {'error':'Không tìm thấy buổi học.'},200 if s else 404);return True
+    return False
+
+
 class AppHandler(LegacyHandler):
-    server_version = 'EnglishMatch/2.1'
+    server_version = 'EnglishMatch/2.2'
 
     def read_json(self):
         try:
@@ -629,6 +860,8 @@ class AppHandler(LegacyHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if learning_get(self, path, parse_qs(urlparse(self.path).query)):
+            return
         if path == '/api/progress':
             with db_connect() as con:
                 self.send_json({'database_id': database_id(con), 'item': get_progress(con)})
@@ -665,13 +898,14 @@ class AppHandler(LegacyHandler):
             clean = validate_backup(data.get('backup'))
             token = backup_token(clean)
             if path.endswith('/preview'):
-                self.send_json({'token': token, 'lists': len(clean['lists']), 'words': len(clean['vocabulary']), 'has_progress': clean['progress'] is not None})
+                self.send_json({'token': token, 'lists': len(clean['lists']), 'words': len(clean['vocabulary']), 'has_progress': clean['progress'] is not None, 'history_count': len(clean['learning']['sessions'])})
                 return
             if data.get('token') != token:
                 raise ValueError('Nội dung đã thay đổi. Hãy kiểm tra bản sao lưu lại.')
             snapshot = snapshot_database()
             with db_connect() as con:
                 con.execute('BEGIN IMMEDIATE')
+                restore_learning(con, clean['learning'])
                 con.execute('DELETE FROM vocabulary')
                 con.execute('DELETE FROM vocabulary_lists')
                 con.executemany('INSERT INTO vocabulary_lists(id,name,created_at) VALUES(:id,:name,:created_at)', clean['lists'])
@@ -688,19 +922,32 @@ class AppHandler(LegacyHandler):
     def do_PUT(self):
         path = urlparse(self.path).path
         match = re.fullmatch(r'/api/lists/(\d+)', path)
-        if path != '/api/progress' and not match:
+        if path not in ('/api/progress','/api/review/progress') and not match:
             return super().do_PUT()
         data = self.read_json()
         try:
             if data is None:
                 raise ValueError('JSON không hợp lệ.')
             with db_connect() as con:
-                if path == '/api/progress':
-                    validate_progress(data.get('item'))
+                if path in ('/api/progress','/api/review/progress'):
+                    item=data.get('item')
+                    if path=='/api/progress':
+                        validate_progress(item)
+                        meta,records=match_learning(item)
+                        old=get_progress(con)
+                        old_id=(old or {}).get('learning',{}).get('id')
+                        key='progress'
+                    else:
+                        validate_review(item)
+                        meta,records=review_learning(item)
+                        old=review_progress(con)
+                        old_id=(old or {}).get('id')
+                        key='review_progress'
                     if data.get('database_id') != database_id(con):
-                        self.send_json({'error': 'Dữ liệu vừa được khôi phục. Hãy tải lại trang.'}, 409)
+                        self.send_json({'error': 'Dữ liệu vừa được khôi phục. Hãy tải lại trang.'},409)
                         return
-                    con.execute("INSERT OR REPLACE INTO app_meta(key,value) VALUES('progress',?)", (json.dumps(data.get('item'), ensure_ascii=False),))
+                    sync_learning(con,meta,records,old_id)
+                    con.execute('INSERT OR REPLACE INTO app_meta(key,value) VALUES(?,?)',(key,json.dumps(item,ensure_ascii=False)))
                 else:
                     name = normalize_text(data.get('name'), 80)
                     if not name:
@@ -721,7 +968,7 @@ class AppHandler(LegacyHandler):
         return super().do_DELETE()
 
     def serve_static(self, path):
-        allowed = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js'}
+        allowed = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/review.js': 'review.js'}
         if path not in allowed or not (ROOT / allowed[path]).is_file():
             self.send_json({'error': 'Không tìm thấy tài nguyên.'}, 404)
             return
@@ -739,7 +986,7 @@ class AppHandler(LegacyHandler):
 def main():
     init_db()
     server = ThreadingHTTPServer((HOST, PORT), AppHandler)
-    print(f'English Matching Game v2 đang chạy tại: http://{HOST}:{PORT}')
+    print(f'English Match 2.2 đang chạy tại: http://{HOST}:{PORT}')
     print('Nhấn Ctrl+C để dừng.')
     try:
         server.serve_forever()
