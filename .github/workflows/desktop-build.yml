@@ -33,6 +33,7 @@ jobs:
     defaults:
       run:
         working-directory: desktop
+        shell: bash
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       PYTHONIOENCODING: utf-8
@@ -64,7 +65,7 @@ jobs:
       - name: Open packaged application twice and verify learning data
         run: python scripts/smoke-native.py
       - name: Installer checksums
-        run: python -c "from pathlib import Path; import hashlib; p=Path('release'); files=[f for f in p.iterdir() if f.suffix in ('.exe','.dmg','.zip')]; (p/'SHA256SUMS.txt').write_text(''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n' for f in files),encoding='utf-8')"
+        run: python -c "from pathlib import Path; import hashlib; p=Path('release'); files=[f for f in p.iterdir() if f.suffix in ('.exe','.dmg')]; (p/'SHA256SUMS.txt').write_text(''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n' for f in files),encoding='utf-8')"
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
@@ -84,3 +85,65 @@ jobs:
           name: Test-evidence-${{ matrix.name }}
           retention-days: 7
           path: desktop/test-results/
+      - name: Prepare bounded file delivery
+        run: python scripts/prepare-delivery.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Delivery-${{ matrix.name }}-manifest
+          path: desktop/delivery/manifest.json
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Delivery-${{ matrix.name }}-1
+          path: desktop/delivery/part-1.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-2.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-2
+          path: desktop/delivery/part-2.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-3.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-3
+          path: desktop/delivery/part-3.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-4.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-4
+          path: desktop/delivery/part-4.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-5.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-5
+          path: desktop/delivery/part-5.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-6.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-6
+          path: desktop/delivery/part-6.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-7.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-7
+          path: desktop/delivery/part-7.bin
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('desktop/delivery/part-8.bin') != ''
+        with:
+          name: Delivery-${{ matrix.name }}-8
+          path: desktop/delivery/part-8.bin
+          compression-level: 0
+          retention-days: 1

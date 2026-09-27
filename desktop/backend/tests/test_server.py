@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from contextlib import closing
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -66,7 +67,7 @@ class Tests(unittest.TestCase):
         backup=self.api('GET','/api/backup'); self.api('DELETE','/api/vocabulary/1')
         preview=self.api('POST','/api/restore/preview',{'backup':backup})
         r=self.api('POST','/api/restore',{'backup':backup,'token':preview['token']})
-        with sqlite3.connect(self.folder/'backups'/r['safety_backup']) as con:
+        with closing(sqlite3.connect(self.folder/'backups'/r['safety_backup'])) as con:
             self.assertEqual(con.execute('SELECT COUNT(*) FROM vocabulary').fetchone()[0],15)
         self.assertEqual(self.api('GET','/api/stats')['total_vocabulary'],16)
         self.assertEqual(self.api('GET','/api/progress')['item'],p)
@@ -94,9 +95,10 @@ class Tests(unittest.TestCase):
         self.api('PUT','/api/progress',{'item':p,'database_id':self.api('GET','/api/progress')['database_id']},400)
     def test_old_database_migration(self):
         old=self.folder/'legacy.db'
-        with sqlite3.connect(old) as c:
+        with closing(sqlite3.connect(old)) as c:
             c.execute('CREATE TABLE vocabulary(id INTEGER PRIMARY KEY AUTOINCREMENT,english TEXT NOT NULL COLLATE NOCASE,vietnamese TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(english,vietnamese))')
             c.execute("INSERT INTO vocabulary(english,vietnamese) VALUES('legacy custom','dữ liệu cũ')")
+            c.commit()
         self.app.DB_PATH=old; self.app.init_db()
         self.assertEqual(self.api('GET','/api/vocabulary?search=legacy')['total'],1)
 
