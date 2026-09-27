@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>English Match 2.1 - Học từ vựng</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --line: #e3e6ee;
+      --text: #243047;
+      --muted: #6d778b;
+      --accent: #e85e43;
+      --accent-soft: #fff3ef;
+      --blue: #3569d4;
+      --blue-soft: #eef4ff;
+      --green: #24a865;
+      --green-soft: #dff7e9;
+      --red: #df4b4b;
+      --red-soft: #ffe2e2;
+      --shadow: 0 10px 28px rgba(36, 48, 71, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { width: min(1180px, calc(100% - 28px)); margin: 26px auto 44px; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 16px 18px; box-shadow: var(--shadow);
+    }
+    .brand { min-width: 0; }
+    .brand h1 { margin: 0; font-size: clamp(20px, 3vw, 30px); letter-spacing: -.03em; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab {
+      border: 1px solid var(--line); background: #fff; color: var(--text);
+      padding: 10px 14px; border-radius: 12px; font-weight: 700;
+    }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .view { margin-top: 18px; }
+    .hidden { display: none !important; }
+
+    .game-shell { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; align-items: start; }
+    .game-panel, .side-panel, .vocab-panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+    }
+    .game-panel { padding: 18px; }
+    .game-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+    .game-title-wrap { min-width: 220px; }
+    .game-title-wrap strong { display: block; margin-bottom: 7px; }
+    .select-label { display: block; font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 5px; }
+    .select, .input {
+      width: 100%; min-height: 44px; border: 1px solid #cfd5df; border-radius: 11px; padding: 10px 12px;
+      outline: none; color: var(--text); background: #fff;
+    }
+    .select:focus, .input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53,105,212,.12); }
+    .game-select { min-width: 260px; }
+    .game-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .status-line { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-bottom: 13px; }
+    .pill { padding: 7px 10px; border-radius: 999px; background: #f2f4f8; color: var(--muted); font-size: 13px; font-weight: 700; }
+    .pill.primary { background: var(--blue-soft); color: #2f5db3; }
+    .progress-track { height: 8px; background: #edf0f4; border-radius: 99px; overflow: hidden; margin-bottom: 16px; }
+    .progress-bar { height: 100%; width: 0%; background: var(--green); transition: width .25s ease; }
+    .board {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid var(--line); border-left: 1px solid var(--line);
+      min-height: 480px;
+    }
+    .card {
+      min-height: 116px; padding: 12px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      background: #fff; color: var(--text); display: flex; align-items: center; justify-content: center;
+      text-align: center; line-height: 1.22; position: relative;
+      transition: background .16s ease, color .16s ease, opacity .28s ease, transform .12s ease;
+      overflow-wrap: anywhere;
+    }
+    .card:hover { background: #fafbfe; }
+    .card:focus-visible { outline: 3px solid rgba(53,105,212,.35); outline-offset: -3px; z-index: 2; }
+    .card.selected { box-shadow: inset 0 0 0 3px var(--blue); background: var(--blue-soft); }
+    .card.english { color: var(--accent); font-weight: 800; font-size: 17px; }
+    .card.vietnamese { color: #3d536f; font-size: 14px; }
+    .card.correct { background: var(--green-soft); color: #147f49; box-shadow: inset 0 0 0 3px var(--green); }
+    .card.wrong { background: var(--red-soft); color: #b32d2d; box-shadow: inset 0 0 0 3px var(--red); animation: shake .22s linear 2; }
+    .card.matched { opacity: 0; transform: scale(.92); pointer-events: none; }
+    @keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
+    .empty-board { min-height: 360px; display: grid; place-items: center; padding: 30px; color: var(--muted); text-align: center; grid-column: 1/-1; }
+    .complete-box {
+      min-height: 360px; grid-column: 1/-1; display: grid; place-items: center; padding: 28px; text-align: center;
+      background: linear-gradient(180deg, #fff, #fbfffd);
+    }
+    .complete-box h3 { margin: 0 0 8px; color: #147f49; font-size: 24px; }
+    .complete-box p { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
+
+    .side-panel { padding: 16px; }
+    .side-panel h2 { margin: 0 0 12px; font-size: 16px; }
+    .stat { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+    .stat:last-of-type { border-bottom: 0; }
+    .stat b { color: var(--text); text-align: right; }
+    .notice { margin-top: 14px; padding: 11px 12px; border-radius: 12px; background: var(--accent-soft); color: #8b4939; font-size: 13px; line-height: 1.45; }
+    .notice.blue { background: var(--blue-soft); color: #345899; }
+    .btn {
+      border: 0; border-radius: 12px; padding: 10px 13px; font-weight: 800; min-height: 42px;
+      background: var(--accent); color: #fff;
+    }
+    .btn.secondary { background: #edf1f7; color: var(--text); }
+    .btn.blue { background: var(--blue); color: #fff; }
+    .btn.danger { background: #fff0f0; color: #b63131; border: 1px solid #ffd0d0; }
+    .btn:disabled { cursor: not-allowed; opacity: .5; }
+    .side-actions { display: grid; gap: 8px; margin-top: 14px; }
+
+    .vocab-panel { padding: 18px; }
+    .manage-grid { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 22px; }
+    .left-column { padding-right: 22px; border-right: 1px solid var(--line); }
+    .section-title { margin: 0 0 6px; font-size: 20px; }
+    .section-sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; line-height: 1.45; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+    .form-msg { min-height: 22px; margin-top: 10px; font-size: 13px; font-weight: 700; }
+    .form-msg.ok { color: var(--green); }
+    .form-msg.err { color: var(--red); }
+    .divider { height: 1px; background: var(--line); margin: 22px 0; }
+
+    .list-manager { display: grid; gap: 8px; margin-top: 12px; }
+    .list-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+      border: 1px solid var(--line); border-radius: 11px; padding: 9px 10px;
+    }
+    .list-row strong { overflow-wrap: anywhere; }
+    .count-badge { font-size: 12px; font-weight: 800; color: var(--muted); background: #f2f4f8; border-radius: 999px; padding: 5px 8px; }
+    .icon-btn { border: 0; border-radius: 9px; padding: 7px 9px; font-weight: 800; min-height: 34px; }
+    .icon-btn.delete { color: #b63131; background: #fff0f0; }
+
+    .list-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; width: min(100%, 520px); }
+    .filters .input, .filters .select { flex: 1 1 180px; }
+    .vocab-list { display: grid; gap: 8px; max-height: 650px; overflow: auto; padding-right: 4px; }
+    .vocab-row {
+      display: grid; grid-template-columns: minmax(120px, .9fr) minmax(160px, 1.25fr) minmax(135px, .8fr) auto;
+      gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 11px;
+    }
+    .word-en { color: var(--accent); font-weight: 850; overflow-wrap: anywhere; }
+    .word-vi { color: #465870; overflow-wrap: anywhere; }
+    .row-list-select { min-height: 38px; padding: 7px 9px; }
+    .delete-btn { border: 0; background: #fff0f0; color: #b63131; border-radius: 9px; padding: 8px 10px; font-weight: 800; }
+    .small-muted { color: var(--muted); font-size: 13px; }
+    .toast {
+      position: fixed; right: 18px; bottom: 18px; max-width: min(360px, calc(100% - 36px));
+      background: #243047; color: white; border-radius: 12px; padding: 12px 14px; font-size: 14px;
+      opacity: 0; transform: translateY(12px); pointer-events: none; transition: .2s ease; z-index: 20;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 920px) {
+      .game-shell { grid-template-columns: 1fr; }
+      .side-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+      .side-panel h2, .notice, .side-actions { grid-column: 1 / -1; }
+      .manage-grid { grid-template-columns: 1fr; }
+      .left-column { border-right: 0; border-bottom: 1px solid var(--line); padding-right: 0; padding-bottom: 22px; }
+    }
+    @media (max-width: 680px) {
+      .app { width: min(100% - 16px, 1180px); margin-top: 8px; }
+      .topbar { align-items: flex-start; flex-direction: column; border-radius: 14px; }
+      .tabs { width: 100%; }
+      .tab { flex: 1; }
+      .game-panel, .side-panel, .vocab-panel { border-radius: 14px; }
+      .game-panel { padding: 10px; }
+      .game-head { align-items: stretch; }
+      .game-title-wrap, .game-select { width: 100%; min-width: 0; }
+      .game-actions { width: 100%; }
+      .game-actions .btn { flex: 1; }
+      .board { grid-template-columns: repeat(2, minmax(0, 1fr)); min-height: 0; }
+      .card { min-height: 96px; }
+      .vocab-row { grid-template-columns: 1fr auto; }
+      .word-vi, .row-list-wrap { grid-column: 1 / -1; }
+      .word-vi { grid-row: 2; }
+      .row-list-wrap { grid-row: 3; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+
+    .text-btn { border:0; background:transparent; color:var(--blue); font-weight:700; padding:5px; }
+    .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .vocab-row { grid-template-columns:minmax(90px,.9fr) minmax(120px,1.25fr) minmax(120px,.8fr) auto; }
+    .data-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr); gap:22px; }
+    .data-grid > section { min-width:0; }
+    textarea.input { min-height:180px; resize:vertical; line-height:1.5; }
+    .preview-wrap { overflow:auto; max-height:360px; margin:14px 0; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th,td { text-align:left; padding:9px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
+    th { background:#f4f6fa; position:sticky; top:0; }
+    .status-error { color:#b63131; } .status-new { color:#147f49; } .status-duplicate { color:#765e22; }
+    .save-error { background:var(--red-soft); color:#b63131; }
+    .form-msg { overflow-wrap:anywhere; }
+    dialog { border:1px solid var(--line); border-radius:18px; width:min(520px,calc(100% - 28px)); padding:24px; color:var(--text); box-shadow:var(--shadow); }
+    dialog::backdrop { background:rgba(24,35,55,.4); }
+    dialog h2 { margin-top:0; font-size:22px; }
+    .dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+    .help { color:var(--muted); font-size:13px; line-height:1.6; }
+    .full-width { width:100%; }
+    .card.matched { visibility:hidden; }
+    @media(max-width:1000px) { .manage-grid { grid-template-columns:1fr; } .left-column { border-right:0; padding-right:0; } }
+    @media(max-width:760px) { .data-grid { grid-template-columns:1fr; } }
+    @media(max-width:680px) { .vocab-row { grid-template-columns:1fr auto; } .row-actions { grid-column:2; grid-row:1; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>English Match</h1>
+        <p>Học theo list · Lưu tiến độ · Tiếp tục bất cứ lúc nào</p>
+      </div>
+      <nav class="tabs" aria-label="Chức năng">
+        <button class="tab active" data-view="game" type="button">Học từ</button>
+        <button class="tab" data-view="vocab" type="button">Quản lý từ & list</button><button class="tab" data-view="data" type="button">Nhập & sao lưu</button>
+      </nav>
+    </header>
+
+    <section id="gameView" class="view">
+      <div class="game-shell">
+        <section class="game-panel" aria-labelledby="gameTitle">
+          <div class="game-head">
+            <div class="game-title-wrap">
+              <strong id="gameTitle">Tìm cặp phù hợp</strong>
+              <label class="select-label" for="gameListSelect">Chọn phạm vi học</label>
+              <select id="gameListSelect" class="select game-select"></select>
+            </div>
+            <div class="game-actions">
+              <button class="btn secondary" id="reshuffleBtn" type="button">Trộn vị trí ô</button>
+              <button class="btn blue" id="newRoundBtn" type="button">↻ Vòng random mới</button>
+            </div>
+          </div>
+
+          <div class="status-line">
+            <span class="pill primary" id="scopeLabel">Tất cả list</span>
+            <span class="pill" id="pageLabel">Trang 0/0</span>
+            <span class="pill" id="pairLabel">0/0 cặp</span>
+            <span class="pill" id="roundLabel">0 từ trong vòng</span><span class="pill" id="saveStatus" role="status">Đang tải...</span><button id="retrySaveBtn" class="text-btn hidden" type="button">Thử lưu lại</button>
+          </div>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+          <div id="board" class="board" aria-live="polite"></div>
+        </section>
+
+        <aside class="side-panel">
+          <h2>Tiến độ</h2>
+          <div class="stat"><span>Tổng từ đã lưu</span><b id="totalStat">0</b></div>
+          <div class="stat"><span>Số list</span><b id="listStat">0</b></div>
+          <div class="stat"><span>Từ trong lựa chọn</span><b id="scopeCountStat">0</b></div>
+          <div class="stat"><span>Đúng trang này</span><b id="correctStat">0</b></div>
+          <div class="stat"><span>Sai trang này</span><b id="wrongStat">0</b></div><div class="stat"><span>Đã xong cả vòng</span><b id="roundStat">0/0</b></div>
+          <div class="notice blue">Mỗi cặp từ nằm trong một trang của vòng học. Chuyển trang rồi quay lại vẫn giữ kết quả. Từ mới thêm sẽ có trong vòng tiếp theo.</div>
+          <div class="notice">Đúng: 2 ô xanh rồi biến mất. Sai: 2 ô đỏ rồi trở lại. Hoàn thành trang sẽ tự chuyển sang trang kế tiếp.</div>
+          <div class="side-actions">
+            <button class="btn secondary" id="prevBtn" type="button">← Trang trước</button>
+            <button class="btn" id="nextBtn" type="button">Trang sau →</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="vocabView" class="view hidden">
+      <section class="vocab-panel">
+        <div class="manage-grid">
+          <div class="left-column">
+            <h2 class="section-title">Tạo list từ vựng</h2>
+            <p class="section-sub">Ví dụ: List TOEIC 1, Unit 3, Travel, School... Mỗi từ được gắn vào một list.</p>
+            <form id="listForm">
+              <div class="field">
+                <label for="listNameInput">Tên list</label>
+                <input id="listNameInput" class="input" maxlength="80" autocomplete="off" placeholder="Ví dụ: TOEIC - Part 5" required>
+              </div>
+              <button class="btn blue" type="submit">+ Tạo list</button>
+              <div id="listFormMsg" class="form-msg" aria-live="polite"></div>
+            </form>
+            <div id="listManager" class="list-manager"></div>
+
+            <div class="divider"></div>
+
+            <h2 class="section-title">Thêm từ vựng mới</h2>
+            <p class="section-sub">Từ được lưu trên máy đang chạy web. Bạn có thể sao lưu toàn bộ ở mục “Nhập & sao lưu”.</p>
+            <form id="addForm">
+              <div class="field">
+                <label for="englishInput">Từ tiếng Anh</label>
+                <input id="englishInput" class="input" maxlength="120" autocomplete="off" placeholder="Ví dụ: workshop" required>
+              </div>
+              <div class="field">
+                <label for="vietnameseInput">Nghĩa tiếng Việt</label>
+                <input id="vietnameseInput" class="input" maxlength="220" autocomplete="off" placeholder="Ví dụ: phân xưởng" required>
+              </div>
+              <div class="field">
+                <label for="addListSelect">Lưu vào list</label>
+                <select id="addListSelect" class="select" required></select>
+              </div>
+              <button class="btn" type="submit">+ Lưu từ mới</button>
+              <div id="formMsg" class="form-msg" aria-live="polite"></div>
+            </form>
+          </div>
+
+          <div>
+            <div class="list-head">
+              <div>
+                <h2 class="section-title">Kho từ vựng</h2>
+                <div class="small-muted" id="listCount">0 từ</div>
+              </div>
+              <div class="filters">
+                <select id="manageListFilter" class="select" aria-label="Lọc theo list"></select>
+                <input id="searchInput" class="input" placeholder="Tìm từ hoặc tên list..." autocomplete="off">
+              </div>
+            </div>
+            <div id="vocabList" class="vocab-list"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="dataView" class="view hidden">
+      <div class="vocab-panel data-grid">
+        <section aria-labelledby="importTitle">
+          <h2 class="section-title" id="importTitle">Nhập nhiều từ cùng lúc</h2>
+          <p class="section-sub">Dán hai cột từ Excel, nhập “từ | nghĩa” hoặc chọn CSV UTF-8. Cặp đã có sẽ được bỏ qua.</p>
+          <div class="field"><label for="importListSelect">Nhập vào list</label><select id="importListSelect" class="select"></select></div>
+          <div class="field"><label for="importFile">Chọn file CSV / TSV / TXT</label><input id="importFile" class="input" type="file" accept=".csv,.tsv,.txt,text/csv,text/plain"></div>
+          <div class="field"><label for="importText">Nội dung (tối đa 5.000 dòng mỗi lần)</label><textarea id="importText" class="input" placeholder="noon | giữa trưa&#10;workshop | phân xưởng"></textarea></div>
+          <div class="field">
+            <label for="delimiterSelect">Dấu phân cách hai cột</label>
+            <select class="select" id="delimiterSelect">
+              <option value="auto">Tự nhận diện</option>
+              <option value="pipe">Dấu |</option>
+              <option value="tab">Tab (dán từ Excel)</option>
+              <option value=",">Dấu phẩy ,</option>
+              <option value=";">Dấu chấm phẩy ;</option>
+            </select>
+          </div>
+          <button type="button" id="previewImportBtn" class="btn secondary">Xem trước</button>
+          <button type="button" id="applyImportBtn" class="btn" disabled>Nhập từ hợp lệ</button>
+          <div id="importMessage" class="form-msg" role="status"></div>
+          <div id="importPreview" class="preview-wrap"></div>
+          <p class="help">CSV có thể có tiêu đề english,vietnamese. Nếu nghĩa chứa dấu phẩy, đặt nghĩa trong ngoặc kép hoặc chọn dấu phân cách khác. File .xlsx cần lưu thành CSV UTF-8 trước.</p>
+        </section>
+        <section aria-labelledby="backupTitle">
+          <h2 class="section-title" id="backupTitle">Sao lưu & khôi phục</h2>
+          <p class="section-sub">Một file JSON chứa toàn bộ list, từ vựng và vòng học đang lưu.</p>
+          <button type="button" id="downloadBackupBtn" class="btn blue full-width">↓ Tải bản sao lưu</button>
+          <div class="divider"></div>
+          <div class="field"><label for="restoreFile">Chọn bản sao lưu JSON</label><input id="restoreFile" type="file" accept=".json,application/json" class="input"></div>
+          <button type="button" id="previewRestoreBtn" class="btn secondary">Kiểm tra bản sao lưu</button>
+          <div id="restoreMessage" class="form-msg" role="status"></div>
+          <button type="button" id="applyRestoreBtn" class="btn danger hidden">Khôi phục dữ liệu này</button>
+          <p class="help">Khôi phục thay thế dữ liệu hiện tại. Trước khi thay thế, ứng dụng tự lưu một bản database trong thư mục backups bên trong thư mục dữ liệu (menu Dữ liệu → Mở thư mục dữ liệu).</p>
+          <div class="notice blue">Tải bản sao lưu sau khi nhập bộ từ quan trọng và trước khi cập nhật ứng dụng.</div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+
+  <dialog id="editDialog" aria-labelledby="editTitle">
+    <form id="editForm">
+      <h2 id="editTitle">Sửa từ vựng</h2>
+      <div class="field"><label for="editEnglish">Từ tiếng Anh</label><input id="editEnglish" class="input" maxlength="120" required></div>
+      <div class="field"><label for="editVietnamese">Nghĩa tiếng Việt</label><input id="editVietnamese" class="input" maxlength="220" required></div>
+      <div class="field"><label for="editListSelect">List</label><select id="editListSelect" class="select"></select></div>
+      <div id="editMessage" class="form-msg" role="status"></div>
+      <div class="dialog-actions"><button id="cancelEditBtn" class="btn secondary" type="button">Hủy</button><button class="btn" type="submit">Lưu thay đổi</button></div>
+    </form>
+  </dialog>
+  <dialog id="renameDialog" aria-labelledby="renameTitle">
+    <form id="renameForm">
+      <h2 id="renameTitle">Đổi tên list</h2>
+      <div class="field"><label for="renameInput">Tên mới</label><input id="renameInput" class="input" maxlength="80" required></div>
+      <div id="renameMessage" class="form-msg" role="status"></div>
+      <div class="dialog-actions"><button id="cancelRenameBtn" class="btn secondary" type="button">Hủy</button><button class="btn" type="submit">Lưu tên</button></div>
+    </form>
+  </dialog>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+node_modules/
+build/
+release/
+__pycache__/
+*.pyc
+*.db
+*.sqlite3
+*.log
+test-results/
+.venv/

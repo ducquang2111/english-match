@@ -1,0 +1,48 @@
+{
+  "name": "english-match-desktop",
+  "productName": "English Match",
+  "version": "1.0.0",
+  "description": "English Match — học từ vựng offline trên Windows và macOS",
+  "author": "ducquang2111",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "build:backend": "python scripts/build-backend.py",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.englishmatch.desktop",
+    "productName": "English Match",
+    "asar": true,
+    "directories": {"output": "release", "buildResources": "assets"},
+    "files": ["electron/**/*", "package.json", "README.md"],
+    "extraResources": [{"from": "build/backend/english-match-backend", "to": "backend"}],
+    "artifactName": "English-Match-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.education",
+      "minimumSystemVersion": "13.0",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "icon": "assets/icon.png"
+    },
+    "dmg": {"title": "English Match", "sign": false},
+    "win": {"target": ["nsis"], "icon": "assets/icon.ico"},
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": false
+    },
+    "publish": null
+  }
+}

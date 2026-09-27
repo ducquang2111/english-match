@@ -1,0 +1,127 @@
+{
+  "format": "english-match-backup",
+  "version": 1,
+  "exported_at": "2026-09-27T06:49:40.224336+00:00",
+  "lists": [
+    {
+      "id": 1,
+      "name": "List 1",
+      "created_at": "2026-09-22 01:20:33"
+    }
+  ],
+  "vocabulary": [
+    {
+      "id": 1,
+      "english": "noon",
+      "vietnamese": "giữa trưa",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 2,
+      "english": "workshop",
+      "vietnamese": "phân xưởng / xưởng làm việc",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 3,
+      "english": "cafeteria",
+      "vietnamese": "quán ăn tự phục vụ",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 4,
+      "english": "rental",
+      "vietnamese": "sự cho thuê",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 5,
+      "english": "conference",
+      "vietnamese": "hội nghị / hội thảo",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 6,
+      "english": "o'clock",
+      "vietnamese": "giờ đúng",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 7,
+      "english": "luggage",
+      "vietnamese": "hành lý",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 8,
+      "english": "enclose",
+      "vietnamese": "bao quanh / vây quanh",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 9,
+      "english": "journey",
+      "vietnamese": "chuyến đi / hành trình",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 10,
+      "english": "repair",
+      "vietnamese": "sửa chữa",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 11,
+      "english": "cashier",
+      "vietnamese": "thu ngân",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 12,
+      "english": "exchange",
+      "vietnamese": "trao đổi",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 13,
+      "english": "schedule",
+      "vietnamese": "lịch trình",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 14,
+      "english": "arrival",
+      "vietnamese": "sự đến nơi",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 15,
+      "english": "departure",
+      "vietnamese": "sự khởi hành",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    },
+    {
+      "id": 16,
+      "english": "passenger",
+      "vietnamese": "hành khách",
+      "created_at": "2026-09-22 01:01:02",
+      "list_id": 1
+    }
+  ],
+  "progress": null
+}
