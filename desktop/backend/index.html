@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>English Match 2.2 - Học từ vựng</title>
+  <title>English Match - Học từ vựng</title>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -117,7 +117,7 @@
     .side-actions { display: grid; gap: 8px; margin-top: 14px; }
 
     .vocab-panel { padding: 18px; }
-    .manage-grid { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 22px; }
+    .manage-grid { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 22px; }
     .left-column { padding-right: 22px; border-right: 1px solid var(--line); }
     .section-title { margin: 0 0 6px; font-size: 20px; }
     .section-sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; line-height: 1.45; }
@@ -189,7 +189,12 @@
 
     .text-btn { border:0; background:transparent; color:var(--blue); font-weight:700; padding:5px; }
     .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
-    .vocab-row { grid-template-columns:minmax(90px,.9fr) minmax(120px,1.25fr) minmax(120px,.8fr) auto; }
+    .vocab-row, .vocab-header { grid-template-columns:minmax(96px,.9fr) 64px minmax(100px,1fr) minmax(145px,1.3fr) minmax(118px,.9fr) 148px; }
+    .vocab-header { display:grid; gap:10px; padding:10px 15px 10px 11px; color:var(--muted); font-size:12px; font-weight:800; }
+    .vocab-row > * { min-width:0; }
+    .word-pos, .word-phonetic { color:#465870; overflow-wrap:anywhere; line-height:1.5; }
+    .word-pos { font-size:13px; font-weight:700; }
+    .word-phonetic { font-size:14px; }
     .data-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr); gap:22px; }
     .data-grid > section { min-width:0; }
     textarea.input { min-height:180px; resize:vertical; line-height:1.5; }
@@ -207,9 +212,19 @@
     .help { color:var(--muted); font-size:13px; line-height:1.6; }
     .full-width { width:100%; }
     .card.matched { visibility:hidden; }
-    @media(max-width:1000px) { .manage-grid { grid-template-columns:1fr; } .left-column { border-right:0; padding-right:0; } }
+    @media(max-width:1180px) { .manage-grid { grid-template-columns:1fr; } .left-column { border-right:0; padding-right:0; border-bottom:1px solid var(--line); padding-bottom:22px; } }
     @media(max-width:760px) { .data-grid { grid-template-columns:1fr; } }
-    @media(max-width:680px) { .vocab-row { grid-template-columns:1fr auto; } .row-actions { grid-column:2; grid-row:1; } }
+    @media(max-width:820px) {
+      .vocab-header { display:none; }
+      .vocab-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+      .vocab-row .word-en { grid-column:1 / -1; grid-row:1; }
+      .vocab-row .word-pos { grid-column:1; grid-row:2; }
+      .vocab-row .word-phonetic { grid-column:2; grid-row:2; }
+      .vocab-row .word-vi { grid-column:1 / -1; grid-row:3; }
+      .vocab-row .row-list-wrap { grid-column:1 / -1; grid-row:4; }
+      .vocab-row .row-actions { grid-column:1 / -1; grid-row:5; justify-content:flex-end; }
+      .vocab-row [data-label]::before { content:attr(data-label); display:block; margin-bottom:4px; color:var(--muted); font-size:11px; font-weight:700; }
+    }
     .topbar { flex-direction:column; align-items:stretch; }
     .review-layout { display:grid; grid-template-columns:minmax(0,1fr) 270px; gap:18px; align-items:start; }
     .review-controls { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -379,11 +394,19 @@
             <div class="divider"></div>
 
             <h2 class="section-title">Thêm từ vựng mới</h2>
-            <p class="section-sub">Từ được lưu trên máy đang chạy web. Bạn có thể sao lưu toàn bộ ở mục “Nhập & sao lưu”.</p>
+            <p class="section-sub">Từ được lưu trên máy. Loại từ và phiên âm chỉ hiển thị trong mục quản lý, không hiện khi học.</p>
             <form id="addForm">
               <div class="field">
                 <label for="englishInput">Từ tiếng Anh</label>
-                <input id="englishInput" class="input" maxlength="120" autocomplete="off" placeholder="Ví dụ: workshop" required>
+                <input id="englishInput" class="input" maxlength="120" autocomplete="off" placeholder="Ví dụ: order (chỉ nhập từ)" required>
+              </div>
+              <div class="field">
+                <label for="partOfSpeechInput">Loại từ <span class="small-muted">(không bắt buộc)</span></label>
+                <input id="partOfSpeechInput" class="input" maxlength="64" list="partOfSpeechOptions" autocomplete="off" placeholder="Ví dụ: n, v, adj, n/v">
+              </div>
+              <div class="field">
+                <label for="phoneticInput">Phiên âm <span class="small-muted">(không bắt buộc)</span></label>
+                <input id="phoneticInput" class="input" maxlength="256" autocomplete="off" spellcheck="false" placeholder="Ví dụ: /ˈɔːdə/">
               </div>
               <div class="field">
                 <label for="vietnameseInput">Nghĩa tiếng Việt</label>
@@ -406,10 +429,13 @@
               </div>
               <div class="filters">
                 <select id="manageListFilter" class="select" aria-label="Lọc theo list"></select>
-                <input id="searchInput" class="input" placeholder="Tìm từ hoặc tên list..." autocomplete="off">
+                <input id="searchInput" class="input" placeholder="Tìm từ, nghĩa, loại từ, phiên âm, list..." aria-label="Tìm trong kho từ vựng" autocomplete="off">
               </div>
             </div>
-            <div id="vocabList" class="vocab-list"></div>
+            <div class="vocab-table" role="table" aria-label="Kho từ vựng">
+              <div class="vocab-header" role="row"><span role="columnheader">Từ tiếng Anh</span><span role="columnheader">Loại từ</span><span role="columnheader">Phiên âm</span><span role="columnheader">Nghĩa tiếng Việt</span><span role="columnheader">List</span><span role="columnheader">Thao tác</span></div>
+              <div id="vocabList" class="vocab-list" role="rowgroup"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -456,12 +482,15 @@
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <datalist id="partOfSpeechOptions"><option value="n"></option><option value="v"></option><option value="adj"></option><option value="adv"></option><option value="prep"></option><option value="pron"></option><option value="conj"></option><option value="interj"></option><option value="n/v"></option></datalist>
 
 
   <dialog id="editDialog" aria-labelledby="editTitle">
     <form id="editForm">
       <h2 id="editTitle">Sửa từ vựng</h2>
       <div class="field"><label for="editEnglish">Từ tiếng Anh</label><input id="editEnglish" class="input" maxlength="120" required></div>
+      <div class="field"><label for="editPartOfSpeech">Loại từ (không bắt buộc)</label><input id="editPartOfSpeech" class="input" maxlength="64" list="partOfSpeechOptions" autocomplete="off" placeholder="Ví dụ: n/v"></div>
+      <div class="field"><label for="editPhonetic">Phiên âm (không bắt buộc)</label><input id="editPhonetic" class="input" maxlength="256" autocomplete="off" spellcheck="false" placeholder="Ví dụ: /ˈɔːdə/"></div>
       <div class="field"><label for="editVietnamese">Nghĩa tiếng Việt</label><input id="editVietnamese" class="input" maxlength="220" required></div>
       <div class="field"><label for="editListSelect">List</label><select id="editListSelect" class="select"></select></div>
       <div id="editMessage" class="form-msg" role="status"></div>

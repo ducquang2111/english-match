@@ -1,4 +1,4 @@
-"""A desktop 1.0 database must survive the 1.1 schema upgrade unchanged."""
+"""Old desktop databases must survive schema upgrades without losing words/progress."""
 from contextlib import closing
 import json
 from pathlib import Path
@@ -35,6 +35,8 @@ class UpgradeTests(unittest.TestCase):
                 desktop_server.initialize(Path(folder))
                 with desktop_server.web.db_connect() as con:
                     self.assertEqual(con.execute('SELECT count(*) FROM vocabulary').fetchone()[0],1)
+                    details = con.execute('SELECT part_of_speech,phonetic FROM vocabulary').fetchone()
+                    self.assertEqual(tuple(details), ('', ''))
                     self.assertEqual(con.execute('SELECT name FROM vocabulary_lists').fetchone()[0],'My existing list')
                     self.assertEqual(desktop_server.web.database_id(con),'existing-desktop-id')
                     self.assertEqual(desktop_server.web.get_progress(con),old_progress)

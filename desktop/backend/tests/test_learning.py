@@ -71,7 +71,7 @@ class LearningTests(unittest.TestCase):
 
     def test_backup_v2_roundtrip_and_old_backup_compatibility(self):
         s=self.review();self.result(s,False,'wrong');self.save(s)
-        before=self.api('GET','/api/learning/stats');backup=self.api('GET','/api/backup');self.assertEqual(backup['version'],2)
+        before=self.api('GET','/api/learning/stats');backup=self.api('GET','/api/backup');self.assertEqual(backup['version'],3)
         self.save(None)
         preview=self.api('POST','/api/restore/preview',{'backup':backup});self.assertEqual(preview['history_count'],1)
         oldid=self.api('GET','/api/review/progress')['database_id']

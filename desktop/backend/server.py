@@ -69,6 +69,20 @@ def normalize_text(value, max_len):
     return text
 
 
+def word_details(data, current=None):
+    """Optional management fields; omitted fields are preserved on partial edits."""
+    result = {}
+    for key, label, limit in [('part_of_speech', 'Loại từ', 64), ('phonetic', 'Phiên âm', 256)]:
+        value = data.get(key, current[key] if current is not None else '')
+        if not isinstance(value, str):
+            raise ValueError(f'{label} phải là văn bản; có thể để trống.')
+        value = re.sub(r'\s+', ' ', value.strip())
+        if len(value) > limit:
+            raise ValueError(f'{label} tối đa {limit} ký tự.')
+        result[key] = value
+    return result
+
+
 def get_default_list_id(con):
     row = con.execute(
         'SELECT id FROM vocabulary_lists WHERE name = ? COLLATE NOCASE LIMIT 1',
@@ -118,6 +132,9 @@ def init_db():
         columns = {row['name'] for row in con.execute('PRAGMA table_info(vocabulary)').fetchall()}
         if 'list_id' not in columns:
             con.execute('ALTER TABLE vocabulary ADD COLUMN list_id INTEGER')
+        for column in ('part_of_speech', 'phonetic'):
+            if column not in columns:
+                con.execute(f"ALTER TABLE vocabulary ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
 
         seeded = con.execute("SELECT value FROM app_meta WHERE key='seeded'").fetchone()
         unassigned = con.execute('SELECT COUNT(*) FROM vocabulary WHERE list_id IS NULL OR list_id NOT IN (SELECT id FROM vocabulary_lists)').fetchone()[0]
@@ -160,7 +177,7 @@ class LegacyHandler(BaseHTTPRequestHandler):
 
     def vocabulary_select_sql(self):
         return (
-            'SELECT v.id, v.english, v.vietnamese, v.list_id, v.created_at, '
+            'SELECT v.id, v.english, v.vietnamese, v.part_of_speech, v.phonetic, v.list_id, v.created_at, '
             'COALESCE(l.name, ?) AS list_name '
             'FROM vocabulary v '
             'LEFT JOIN vocabulary_lists l ON l.id = v.list_id '
@@ -191,8 +208,8 @@ class LegacyHandler(BaseHTTPRequestHandler):
 
             if search:
                 like = f'%{search}%'
-                where.append('(v.english LIKE ? OR v.vietnamese LIKE ? OR l.name LIKE ?)')
-                params.extend([like, like, like])
+                where.append('(v.english LIKE ? OR v.vietnamese LIKE ? OR v.part_of_speech LIKE ? OR v.phonetic LIKE ? OR l.name LIKE ?)')
+                params.extend([like] * 5)
 
             if raw_list_id and raw_list_id.lower() != 'all':
                 try:
@@ -255,6 +272,11 @@ class LegacyHandler(BaseHTTPRequestHandler):
         if parsed.path == '/api/vocabulary':
             english = normalize_text(data.get('english'), 120)
             vietnamese = normalize_text(data.get('vietnamese'), 220)
+            try:
+                details = word_details(data)
+            except ValueError as exc:
+                self.send_json({'error': str(exc)}, 400)
+                return
             if english is None or vietnamese is None:
                 self.send_json({'error': 'Vui lòng nhập đủ từ tiếng Anh và nghĩa tiếng Việt.'}, 400)
                 return
@@ -280,8 +302,8 @@ class LegacyHandler(BaseHTTPRequestHandler):
                         self.send_json({'error': 'Kho từ tối đa 10.000 cặp.'}, 400)
                         return
                     cur = con.execute(
-                        'INSERT INTO vocabulary (english, vietnamese, list_id) VALUES (?, ?, ?)',
-                        (english, vietnamese, list_id),
+                        'INSERT INTO vocabulary (english, vietnamese, list_id, part_of_speech, phonetic) VALUES (?, ?, ?, ?, ?)',
+                        (english, vietnamese, list_id, details['part_of_speech'], details['phonetic']),
                     )
                     con.commit()
                     row = con.execute(
@@ -310,7 +332,7 @@ class LegacyHandler(BaseHTTPRequestHandler):
         item_id = int(match.group(1))
         with db_connect() as con:
             current = con.execute(
-                'SELECT id, english, vietnamese, list_id FROM vocabulary WHERE id=?',
+                'SELECT id, english, vietnamese, list_id, part_of_speech, phonetic FROM vocabulary WHERE id=?',
                 (item_id,),
             ).fetchone()
             if not current:
@@ -320,6 +342,11 @@ class LegacyHandler(BaseHTTPRequestHandler):
             english = current['english']
             vietnamese = current['vietnamese']
             list_id = current['list_id']
+            try:
+                details = word_details(data, current)
+            except ValueError as exc:
+                self.send_json({'error': str(exc)}, 400)
+                return
 
             if 'english' in data:
                 value = normalize_text(data.get('english'), 120)
@@ -353,8 +380,8 @@ class LegacyHandler(BaseHTTPRequestHandler):
 
             try:
                 con.execute(
-                    'UPDATE vocabulary SET english=?, vietnamese=?, list_id=? WHERE id=?',
-                    (english, vietnamese, list_id, item_id),
+                    'UPDATE vocabulary SET english=?, vietnamese=?, list_id=?, part_of_speech=?, phonetic=? WHERE id=?',
+                    (english, vietnamese, list_id, details['part_of_speech'], details['phonetic'], item_id),
                 )
                 con.commit()
                 row = con.execute(
@@ -504,7 +531,7 @@ def ascii_lower(s):
 
 
 def export_backup(con):
-    return {'format': 'english-match-backup', 'version': 2,
+    return {'format': 'english-match-backup', 'version': 3,
             'exported_at': datetime.now(timezone.utc).isoformat(),
             'lists': [dict(r) for r in con.execute('SELECT * FROM vocabulary_lists ORDER BY id')],
             'vocabulary': [dict(r) for r in con.execute('SELECT * FROM vocabulary ORDER BY id')],
@@ -512,8 +539,8 @@ def export_backup(con):
 
 
 def validate_backup(raw):
-    if not isinstance(raw, dict) or raw.get('format') != 'english-match-backup' or raw.get('version') not in (1, 2):
-        raise ValueError('Hãy chọn file JSON được xuất từ English Match đợt 1 hoặc đợt 2.')
+    if not isinstance(raw, dict) or raw.get('format') != 'english-match-backup' or raw.get('version') not in (1, 2, 3):
+        raise ValueError('Hãy chọn file JSON sao lưu được xuất từ English Match (định dạng 1, 2 hoặc 3).')
     lists, words = raw.get('lists'), raw.get('vocabulary')
     if not isinstance(lists, list) or not isinstance(words, list) or len(lists) > 10000 or len(words) > 10000:
         raise ValueError('Cấu trúc hoặc số lượng dữ liệu không hợp lệ (tối đa 10.000 từ).')
@@ -537,11 +564,11 @@ def validate_backup(raw):
         if pair in pairs:
             raise ValueError('Bản sao lưu có cặp từ trùng nhau.')
         pairs.add(pair); ids.add(r['id'])
-        clean_words.append({'id': r['id'], 'english': en, 'vietnamese': vi, 'list_id': r['list_id'], 'created_at': str(r.get('created_at', ''))[:100]})
+        clean_words.append({'id': r['id'], 'english': en, 'vietnamese': vi, 'list_id': r['list_id'], 'created_at': str(r.get('created_at', ''))[:100], **word_details(r)})
     progress = raw.get('progress')
     validate_progress(progress)
     match_learning(progress)
-    if raw['version']==2 and not isinstance(raw.get('learning'),dict):
+    if raw['version'] >= 2 and not isinstance(raw.get('learning'),dict):
         raise ValueError('Bản sao lưu thiếu dữ liệu học tập.')
     return {'lists': clean_lists, 'vocabulary': clean_words, 'progress': progress, 'learning': validate_learning_backup(raw.get('learning'))}
 
@@ -909,7 +936,7 @@ class AppHandler(LegacyHandler):
                 con.execute('DELETE FROM vocabulary')
                 con.execute('DELETE FROM vocabulary_lists')
                 con.executemany('INSERT INTO vocabulary_lists(id,name,created_at) VALUES(:id,:name,:created_at)', clean['lists'])
-                con.executemany('INSERT INTO vocabulary(id,english,vietnamese,list_id,created_at) VALUES(:id,:english,:vietnamese,:list_id,:created_at)', clean['vocabulary'])
+                con.executemany('INSERT INTO vocabulary(id,english,vietnamese,list_id,created_at,part_of_speech,phonetic) VALUES(:id,:english,:vietnamese,:list_id,:created_at,:part_of_speech,:phonetic)', clean['vocabulary'])
                 con.execute("INSERT OR REPLACE INTO app_meta(key,value) VALUES('progress',?)", (json.dumps(clean['progress'], ensure_ascii=False),))
                 con.execute("INSERT OR REPLACE INTO app_meta(key,value) VALUES('seeded','1')")
                 con.execute("INSERT OR REPLACE INTO app_meta(key,value) VALUES('database_id',?)", (uuid.uuid4().hex,))

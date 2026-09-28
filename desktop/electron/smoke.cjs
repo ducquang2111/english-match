@@ -25,12 +25,28 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
       const first=document.querySelector('#board .card.english');
       first.click();document.querySelector('[data-key="'+first.dataset.pairId+'-vi"]').click();
       await window.EnglishMatchDesktop.flush();
-      const r=await fetch('/api/vocabulary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({english:'desktop persistence test',vietnamese:'kiểm tra lưu dữ liệu',list_id:1})});
-      if(r.status!==201)throw new Error('Cannot create word');
-      document.querySelector('[data-view="review"]').click();
-      document.getElementById('reviewMode').value='flashcard';
-      document.getElementById('startReviewBtn').click();
+      document.querySelector('[data-view="vocab"]').click();
+      document.getElementById('englishInput').value='order';
+      document.getElementById('vietnameseInput').value='đặt hàng';
+      document.getElementById('partOfSpeechInput').value='n/v';
+      document.getElementById('phoneticInput').value='/ˈɔːdə/';
+      document.getElementById('addForm').requestSubmit();
     })()`);
+    await wait(`document.getElementById('formMsg').textContent.startsWith('Đã lưu từ.')`);
+    const added=(await api('/api/vocabulary?search=order')).items[0];
+    assert.equal(added.english,'order');assert.equal(added.part_of_speech,'n/v');assert.equal(added.phonetic,'/ˈɔːdə/');
+    await evaluate(`(()=>{
+      const row=document.querySelector('.vocab-row[data-id="${added.id}"]');
+      if(row.querySelector('.word-pos').textContent!=='n/v'||row.querySelector('.word-phonetic').textContent!=='/ˈɔːdə/')throw new Error('Missing management columns');
+      [...row.querySelectorAll('button')].find(b=>b.textContent==='Sửa').click();
+      document.getElementById('editPartOfSpeech').value='v/n';
+      document.getElementById('editPhonetic').value='/ˈɔːrdər/';
+      document.getElementById('editForm').requestSubmit();
+    })()`);
+    await wait(`!document.getElementById('editDialog').open && document.querySelector('.vocab-row[data-id="${added.id}"] .word-phonetic').textContent==='/ˈɔːrdər/'`);
+    await flush();
+    assert.equal((await api('/api/progress')).item.pageStates.reduce((n,p)=>n+p.matched.length,0),1);
+    await evaluate(`document.querySelector('[data-view="review"]').click();document.getElementById('reviewMode').value='flashcard';document.getElementById('startReviewBtn').click()`);
     await wait(`Boolean(document.getElementById('flashCard') && !document.getElementById('startReviewBtn').disabled)`);
     await flush();
     assert.equal((await api('/api/review/progress')).item.words.length,17);
@@ -53,6 +69,8 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
     assert.equal((await api('/api/learning/stats')).totals.wrong,1);
   }else{
     assert.equal(stats.total_vocabulary,17);
+    const saved=(await api('/api/vocabulary?search=order')).items[0];
+    assert.equal(saved.english,'order');assert.equal(saved.part_of_speech,'v/n');assert.equal(saved.phonetic,'/ˈɔːrdər/');
     const p=await api('/api/progress');
     assert.equal(p.item.pageStates.reduce((n,p)=>n+p.matched.length,0),1);
     const review=(await api('/api/review/progress')).item;
@@ -74,14 +92,23 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
     assert.equal(await evaluate(`document.getElementById('wrongMetric').textContent`),'0');
   }
   const backup=await api('/api/backup');
-  assert.equal(backup.version,2);assert.equal(backup.vocabulary.length,17);
+  assert.equal(backup.version,3);assert.equal(backup.vocabulary.length,17);
   assert.ok(backup.learning.sessions.some(s=>s.mode==='flashcard'));
   assert.ok(backup.learning.sessions.some(s=>s.mode==='typing'));
+  const savedWord=backup.vocabulary.find(w=>w.english==='order');
+  assert.equal(savedWord.part_of_speech,'v/n');assert.equal(savedWord.phonetic,'/ˈɔːrdər/');
+  const vocabulary=(await api('/api/vocabulary')).items;
+  const cards=await evaluate(`[...document.querySelectorAll('#board .card.english')].map(c=>({id:Number(c.dataset.pairId),text:c.textContent}))`);
+  for(const card of cards)assert.equal(card.text,vocabulary.find(w=>w.id===card.id).english);
+  assert.equal(await evaluate(`document.getElementById('reviewView').textContent.includes('/ˈɔːrdər/') || document.getElementById('historyView').textContent.includes('/ˈɔːrdər/')`),false);
+  await evaluate(`document.querySelector('[data-view="vocab"]').click()`);
+  assert.equal(await evaluate(`document.querySelector('.vocab-row[data-id="${savedWord.id}"] .word-pos').textContent`),'v/n');
+  assert.equal(await evaluate(`document.querySelector('.vocab-row[data-id="${savedWord.id}"] .word-phonetic').textContent`),'/ˈɔːrdər/');
   assert.equal((await fetch(origin+'/server.py',{headers:{'X-English-Match-Desktop':token}})).status,404);
   const speech=await evaluate(`({supported:'speechSynthesis' in window,englishVoices:window.speechSynthesis?.getVoices().filter(v=>/^en(?:-|_|$)/i.test(v.lang)).length||0})`);
   assert.equal(speech.supported,true);
   const image=await wc.capturePage(),out=process.env.EM_SMOKE_OUTPUT;
-  if(out){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,stage+'.png'),image.toPNG());fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify({ok:true,version:'1.1.0',platform:process.platform,arch:process.arch,stage,words:17,matched:1,flashcard:true,typing:true,wrongReview:true,history:true,speech,dataDir},null,2));}
+  if(out){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,stage+'.png'),image.toPNG());fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify({ok:true,version:'1.2.0',platform:process.platform,arch:process.arch,stage,words:17,matched:1,wordDetails:true,matchingTextOnly:true,flashcard:true,typing:true,wrongReview:true,history:true,speech,dataDir},null,2));}
   console.log('NATIVE_DESKTOP_SMOKE_OK '+process.platform+' '+process.arch+' '+stage+' flashcard typing wrong-review history');
   await quit();
 };

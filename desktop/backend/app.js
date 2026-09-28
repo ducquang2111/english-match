@@ -246,13 +246,16 @@
   function renderVocab() {
     const query = $('searchInput').value.trim().toLocaleLowerCase(), listId = $('manageListFilter').value;
     const items = state.vocab.filter(w => (!listId || listId === 'all' || String(w.list_id) === listId) &&
-      (!query || [w.english, w.vietnamese, w.list_name].some(x => x.toLocaleLowerCase().includes(query))));
+      (!query || [w.english, w.vietnamese, w.part_of_speech, w.phonetic, w.list_name].some(x => (x || '').toLocaleLowerCase().includes(query))));
     $('listCount').textContent = `${items.length} từ`; $('vocabList').replaceChildren();
     if (!items.length) { $('vocabList').textContent = 'Không có từ phù hợp.'; return; }
     for (const w of items) {
       const row = document.createElement('div'); row.className = 'vocab-row'; row.dataset.id = String(w.id);
       const en = document.createElement('div'); en.className = 'word-en'; en.textContent = w.english;
       const vi = document.createElement('div'); vi.className = 'word-vi'; vi.textContent = w.vietnamese;
+      const pos = document.createElement('div'); pos.className = 'word-pos'; pos.textContent = w.part_of_speech || '—';
+      const ipa = document.createElement('div'); ipa.className = 'word-phonetic'; ipa.textContent = w.phonetic || '—';
+      for (const [cell, label] of [[en, 'Từ tiếng Anh'], [pos, 'Loại từ'], [ipa, 'Phiên âm'], [vi, 'Nghĩa tiếng Việt']]) cell.dataset.label = label;
       const wrap = document.createElement('div'); wrap.className = 'row-list-wrap';
       const select = document.createElement('select'); select.className = 'select row-list-select'; select.setAttribute('aria-label', `List của từ ${w.english}`);
       state.lists.forEach(l => select.add(new Option(l.name, String(l.id)))); select.value = String(w.list_id);
@@ -266,12 +269,15 @@
       const actions = document.createElement('div'); actions.className = 'row-actions';
       actions.append(actionButton('🔊', 'icon-btn', () => window.Study?.speak(w.english)), actionButton('Sửa', 'icon-btn', () => {
         editId = w.id; $('editEnglish').value = w.english; $('editVietnamese').value = w.vietnamese;
+        $('editPartOfSpeech').value = w.part_of_speech || ''; $('editPhonetic').value = w.phonetic || '';
         $('editListSelect').value = String(w.list_id); message('editMessage', ''); $('editDialog').showModal();
       }), actionButton('Xóa', 'delete-btn', () => {
         if (confirm(`Xóa “${w.english}” khỏi kho từ?`)) perform(async () => { await api(`/api/vocabulary/${w.id}`, { method: 'DELETE' }); await refreshData(); toast('Đã xóa từ.'); });
       }));
       actions.firstElementChild.setAttribute('aria-label', `Nghe phát âm ${w.english}`);
-      row.append(en, vi, wrap, actions); $('vocabList').append(row);
+      row.setAttribute('role', 'row');
+      for (const cell of [en, pos, ipa, vi, wrap, actions]) cell.setAttribute('role', 'cell');
+      row.append(en, pos, ipa, vi, wrap, actions); $('vocabList').append(row);
     }
   }
   async function refreshData() {
@@ -302,14 +308,14 @@
   $('addForm').addEventListener('submit', e => {
     e.preventDefault(); perform(async () => {
       const list_id = $('addListSelect').value;
-      await api('/api/vocabulary', json('POST', { english: $('englishInput').value.trim(), vietnamese: $('vietnameseInput').value.trim(), list_id }));
+      await api('/api/vocabulary', json('POST', { english: $('englishInput').value.trim(), vietnamese: $('vietnameseInput').value.trim(), part_of_speech: $('partOfSpeechInput').value.trim(), phonetic: $('phoneticInput').value.trim(), list_id }));
       $('addForm').reset(); await refreshData(); $('addListSelect').value = list_id;
       message('formMsg', 'Đã lưu từ. Từ mới sẽ có trong vòng random mới.'); $('englishInput').focus();
     }, 'formMsg', e.submitter);
   });
   $('editForm').addEventListener('submit', e => {
     e.preventDefault(); perform(async () => {
-      await api(`/api/vocabulary/${editId}`, json('PUT', { english: $('editEnglish').value.trim(), vietnamese: $('editVietnamese').value.trim(), list_id: $('editListSelect').value }));
+      await api(`/api/vocabulary/${editId}`, json('PUT', { english: $('editEnglish').value.trim(), vietnamese: $('editVietnamese').value.trim(), part_of_speech: $('editPartOfSpeech').value.trim(), phonetic: $('editPhonetic').value.trim(), list_id: $('editListSelect').value }));
       $('editDialog').close(); await refreshData(); toast('Đã lưu thay đổi.');
     }, 'editMessage', e.submitter);
   });
