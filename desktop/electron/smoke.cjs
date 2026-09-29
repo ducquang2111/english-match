@@ -68,7 +68,7 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
     await flush();
     assert.equal((await api('/api/learning/stats')).totals.wrong,1);
   }else{
-    assert.equal(stats.total_vocabulary,17);
+    assert.equal(stats.total_vocabulary,19);
     const saved=(await api('/api/vocabulary?search=order')).items[0];
     assert.equal(saved.english,'order');assert.equal(saved.part_of_speech,'v/n');assert.equal(saved.phonetic,'/ˈɔːrdər/');
     const p=await api('/api/progress');
@@ -91,8 +91,35 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
     await wait(`document.getElementById('historyMessage').textContent==='Đã cập nhật kết quả đã lưu.'`);
     assert.equal(await evaluate(`document.getElementById('wrongMetric').textContent`),'0');
   }
+  if(stage==='create'){
+    await evaluate(`(()=>{
+      document.querySelector('[data-view="data"]').click();
+      const input=document.getElementById('importText');
+      input.value='broken | n | thiếu nghĩa';input.dispatchEvent(new Event('input'));
+      document.getElementById('previewImportBtn').click();
+    })()`);
+    await wait(`document.getElementById('importMessage').textContent.includes('1 dòng lỗi')`);
+    assert.equal(await evaluate(`document.getElementById('applyImportBtn').disabled`),true);
+    await evaluate(`(()=>{
+      const input=document.getElementById('importText');
+      input.value=${JSON.stringify('provide | v | /prəˈvaɪd/ | cung cấp\nafternoon | buổi chiều\norder | n | /unused/ | đặt hàng')};
+      input.dispatchEvent(new Event('input'));
+      document.getElementById('previewImportBtn').click();
+    })()`);
+    await wait(`!document.getElementById('applyImportBtn').disabled`);
+    assert.equal(await evaluate(`document.querySelectorAll('#importPreview th').length`),6);
+    assert.equal(await evaluate(`document.querySelector('#importPreview tbody tr').cells[2].textContent`),'v');
+    assert.equal(await evaluate(`document.querySelector('#importPreview tbody tr').cells[3].textContent`),'/prəˈvaɪd/');
+    await evaluate(`document.getElementById('applyImportBtn').click()`);
+    await wait(`document.getElementById('importMessage').textContent.startsWith('Đã nhập 2 từ; bỏ qua 1 cặp trùng.')`);
+  }
+  const imported=(await api('/api/vocabulary?search=provide')).items[0];
+  assert.equal(imported.english,'provide');assert.equal(imported.part_of_speech,'v');assert.equal(imported.phonetic,'/prəˈvaɪd/');
+  const simple=(await api('/api/vocabulary?search=afternoon')).items[0];
+  assert.equal(simple.part_of_speech,'');assert.equal(simple.phonetic,'');
   const backup=await api('/api/backup');
-  assert.equal(backup.version,3);assert.equal(backup.vocabulary.length,17);
+  assert.equal(backup.version,3);assert.equal(backup.vocabulary.length,19);
+  assert.equal(backup.vocabulary.find(w=>w.english==='provide').phonetic,'/prəˈvaɪd/');
   assert.ok(backup.learning.sessions.some(s=>s.mode==='flashcard'));
   assert.ok(backup.learning.sessions.some(s=>s.mode==='typing'));
   const savedWord=backup.vocabulary.find(w=>w.english==='order');
@@ -108,7 +135,7 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
   const speech=await evaluate(`({supported:'speechSynthesis' in window,englishVoices:window.speechSynthesis?.getVoices().filter(v=>/^en(?:-|_|$)/i.test(v.lang)).length||0})`);
   assert.equal(speech.supported,true);
   const image=await wc.capturePage(),out=process.env.EM_SMOKE_OUTPUT;
-  if(out){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,stage+'.png'),image.toPNG());fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify({ok:true,version:'1.2.0',platform:process.platform,arch:process.arch,stage,words:17,matched:1,wordDetails:true,matchingTextOnly:true,flashcard:true,typing:true,wrongReview:true,history:true,speech,dataDir},null,2));}
+  if(out){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,stage+'.png'),image.toPNG());fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify({ok:true,version:'1.3.0',platform:process.platform,arch:process.arch,stage,words:19,matched:1,wordDetails:true,flexibleImport:true,matchingTextOnly:true,flashcard:true,typing:true,wrongReview:true,history:true,speech,dataDir},null,2));}
   console.log('NATIVE_DESKTOP_SMOKE_OK '+process.platform+' '+process.arch+' '+stage+' flashcard typing wrong-review history');
   await quit();
 };

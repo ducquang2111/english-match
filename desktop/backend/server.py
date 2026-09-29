@@ -587,6 +587,55 @@ def snapshot_database():
     return dest.name
 
 
+IMPORT_FIELDS = {
+    2: ('english', 'vietnamese'),
+    4: ('english', 'part_of_speech', 'phonetic', 'vietnamese'),
+}
+IMPORT_HEADERS = {
+    'english': ('english', 'word', 'từ', 'từ vựng', 'tiếng anh', 'từ tiếng anh'),
+    'vietnamese': ('vietnamese', 'meaning', 'nghĩa', 'tiếng việt', 'nghĩa tiếng việt'),
+    'part_of_speech': ('part of speech', 'pos', 'word type', 'loại từ', 'từ loại'),
+    'phonetic': ('phonetic', 'phonetics', 'ipa', 'pronunciation', 'phiên âm'),
+}
+
+
+def import_header(cells):
+    """Only a complete, recognized header changes the column order."""
+    keys = []
+    for cell in cells:
+        label = unicodedata.normalize('NFC', cell).strip().lower().replace('_', ' ')
+        label = re.sub(r'\s+', ' ', label)
+        keys.append(next((key for key, labels in IMPORT_HEADERS.items() if label in labels), None))
+    expected = IMPORT_FIELDS.get(len(cells))
+    return tuple(keys) if expected and set(keys) == set(expected) else None
+
+
+def import_delimiter(text):
+    """Score logical CSV records; quoted separators and mixed widths are valid."""
+    best, best_score = ',', (-1, -1, -1, -1)
+    for delim in ('\t', '|', ',', ';'):
+        widths, header, details = [], False, 0
+        try:
+            for cells in csv.reader(io.StringIO(text), delimiter=delim, strict=True, skipinitialspace=True):
+                if not cells or not any(cell.strip() for cell in cells):
+                    continue
+                if not widths:
+                    header = import_header(cells) is not None
+                widths.append(len(cells))
+                if len(cells) == 4 and re.fullmatch(r'(?:/[^\n]+/|\[[^\n]+\])', cells[2].strip()):
+                    details += 1
+                if len(widths) == 20:
+                    break
+        except csv.Error:
+            # Keep the candidate so the real parser can report malformed quoting.
+            pass
+        good = sum(width in IMPORT_FIELDS for width in widths)
+        score = (int(header), good, details, sum(width > 1 for width in widths))
+        if score > best_score:
+            best, best_score = delim, score
+    return best
+
+
 def prepare_import(con, data):
     text = data.get('text')
     if not isinstance(text, str) or not text.strip():
@@ -600,36 +649,46 @@ def prepare_import(con, data):
     text = text.lstrip('\ufeff')
     delim = data.get('delimiter', 'auto')
     if delim == 'auto':
-        first = next((x for x in text.splitlines() if x.strip()), '')
-        if '\t' in first:
-            delim = '\t'
-        elif '|' in first:
-            delim = '|'
-        else:
-            try:
-                delim = csv.Sniffer().sniff(text[:4096], delimiters=',;').delimiter
-            except csv.Error:
-                delim = ','
+        delim = import_delimiter(text)
     if delim not in ('\t', '|', ',', ';'):
         raise ValueError('Dấu phân cách không hợp lệ.')
     existing = {(ascii_lower(r[0]), r[1]) for r in con.execute('SELECT english,vietnamese FROM vocabulary')}
     rows, seen, first = [], set(), True
+    fields = dict(IMPORT_FIELDS)
+    header_skipped = False
     try:
-        reader = csv.reader(io.StringIO(text), delimiter=delim, strict=True)
+        reader = csv.reader(io.StringIO(text), delimiter=delim, strict=True, skipinitialspace=True)
         for cells in reader:
             if not cells or not any(x.strip() for x in cells):
                 continue
-            if first and len(cells) == 2 and cells[0].strip().lower() in ('english', 'tiếng anh') and cells[1].strip().lower() in ('vietnamese', 'tiếng việt', 'nghĩa'):
+            header = import_header(cells) if first else None
+            if header:
+                fields[len(cells)] = header
+                header_skipped = True
                 first = False
                 continue
             first = False
             if len(rows) >= 5000:
                 raise ValueError('Mỗi lần nhập tối đa 5.000 dòng.')
-            en = normalize_text(cells[0], 120) if cells else None
-            vi = normalize_text(cells[1], 220) if len(cells) > 1 else None
-            r = {'line': reader.line_num, 'english': en or '', 'vietnamese': vi or ''}
-            if len(cells) != 2 or not en or not vi:
-                r.update(status='error', message='Cần 2 cột, không trống; tiếng Anh ≤120, nghĩa ≤220 ký tự.')
+            values = dict(zip(fields.get(len(cells), ()), cells))
+            en = normalize_text(values.get('english'), 120)
+            vi = normalize_text(values.get('vietnamese'), 220)
+            r = {'line': reader.line_num, 'columns': len(cells),
+                 'english': en or values.get('english', cells[0] if cells else ''),
+                 'vietnamese': vi or values.get('vietnamese', ''),
+                 'part_of_speech': values.get('part_of_speech', '').strip(),
+                 'phonetic': values.get('phonetic', '').strip()}
+            detail_error = None
+            try:
+                r.update(word_details(values))
+            except ValueError as exc:
+                detail_error = str(exc)
+            if len(cells) not in IMPORT_FIELDS:
+                r.update(status='error', message=f'Có {len(cells)} cột. Cần 2 cột (từ | nghĩa) hoặc 4 cột (từ | loại từ | phiên âm | nghĩa).')
+            elif not en or not vi:
+                r.update(status='error', message='Từ và nghĩa không được trống; tiếng Anh ≤120, nghĩa ≤220 ký tự.')
+            elif detail_error:
+                r.update(status='error', message=detail_error)
             elif (ascii_lower(en), vi) in existing | seen:
                 r.update(status='duplicate', message='Cặp đã có, sẽ bỏ qua.')
             else:
@@ -642,7 +701,10 @@ def prepare_import(con, data):
         raise ValueError('Không có dòng từ vựng nào.')
     if len(existing) + len(seen) > 10000:
         raise ValueError('Kho từ tối đa 10.000 cặp.')
-    return {'rows': rows, 'list_id': list_id, 'new': sum(r['status']=='new' for r in rows),
+    return {'rows': rows, 'list_id': list_id, 'delimiter': delim, 'header_skipped': header_skipped,
+            'formats': {'two_columns': sum(r['columns']==2 for r in rows),
+                        'four_columns': sum(r['columns']==4 for r in rows)},
+            'new': sum(r['status']=='new' for r in rows),
             'errors': sum(r['status']=='error' for r in rows), 'duplicates': sum(r['status']=='duplicate' for r in rows)}
 
 
@@ -917,8 +979,8 @@ class AppHandler(LegacyHandler):
                         if report['errors']:
                             self.send_json({'error': 'Hãy sửa hết dòng lỗi trước khi nhập.', **report}, 400)
                             return
-                        con.executemany('INSERT INTO vocabulary(english,vietnamese,list_id) VALUES(?,?,?)',
-                                        [(r['english'], r['vietnamese'], report['list_id']) for r in report['rows'] if r['status']=='new'])
+                        con.executemany('INSERT INTO vocabulary(english,vietnamese,part_of_speech,phonetic,list_id) VALUES(?,?,?,?,?)',
+                                        [(r['english'], r['vietnamese'], r['part_of_speech'], r['phonetic'], report['list_id']) for r in report['rows'] if r['status']=='new'])
                         con.commit()
                 self.send_json(report)
                 return

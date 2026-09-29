@@ -199,6 +199,10 @@
     .data-grid > section { min-width:0; }
     textarea.input { min-height:180px; resize:vertical; line-height:1.5; }
     .preview-wrap { overflow:auto; max-height:360px; margin:14px 0; }
+    #importPreview table { min-width:650px; }
+    .import-examples { background:#f4f6fa; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:16px; }
+    .import-examples p { margin:4px 0; }
+    .import-examples code { display:block; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text); margin:5px 0 10px; }
     table { border-collapse:collapse; width:100%; font-size:13px; }
     th,td { text-align:left; padding:9px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
     th { background:#f4f6fa; position:sticky; top:0; }
@@ -445,12 +449,17 @@
       <div class="vocab-panel data-grid">
         <section aria-labelledby="importTitle">
           <h2 class="section-title" id="importTitle">Nhập nhiều từ cùng lúc</h2>
-          <p class="section-sub">Dán hai cột từ Excel, nhập “từ | nghĩa” hoặc chọn CSV UTF-8. Cặp đã có sẽ được bỏ qua.</p>
+          <p class="section-sub">Tự nhận diện 2 hoặc 4 cột khi dán từ Excel hay chọn CSV / TSV / TXT. Có thể trộn cả hai dạng trong cùng lần nhập.</p>
+          <div class="import-examples help">
+            <p><strong>2 cột:</strong> Từ | Nghĩa</p><code>noon | giữa trưa</code>
+            <p><strong>4 cột:</strong> Từ | Loại từ | Phiên âm | Nghĩa</p><code>provide | v | /prəˈvaɪd/ | cung cấp</code>
+            <p>Có thể để trống loại từ hoặc phiên âm nhưng giữ đủ dấu phân cách. Mỗi lần nhập dùng cùng một dấu phân cách.</p>
+          </div>
           <div class="field"><label for="importListSelect">Nhập vào list</label><select id="importListSelect" class="select"></select></div>
           <div class="field"><label for="importFile">Chọn file CSV / TSV / TXT</label><input id="importFile" class="input" type="file" accept=".csv,.tsv,.txt,text/csv,text/plain"></div>
-          <div class="field"><label for="importText">Nội dung (tối đa 5.000 dòng mỗi lần)</label><textarea id="importText" class="input" placeholder="noon | giữa trưa&#10;workshop | phân xưởng"></textarea></div>
+          <div class="field"><label for="importText">Nội dung (tối đa 5.000 dòng mỗi lần)</label><textarea id="importText" class="input" placeholder="noon | giữa trưa&#10;provide | v | /prəˈvaɪd/ | cung cấp&#10;order | n/v | /ˈɔːdə/ | đơn hàng / đặt hàng"></textarea></div>
           <div class="field">
-            <label for="delimiterSelect">Dấu phân cách hai cột</label>
+            <label for="delimiterSelect">Dấu phân cách các cột</label>
             <select class="select" id="delimiterSelect">
               <option value="auto">Tự nhận diện</option>
               <option value="pipe">Dấu |</option>
@@ -463,11 +472,11 @@
           <button type="button" id="applyImportBtn" class="btn" disabled>Nhập từ hợp lệ</button>
           <div id="importMessage" class="form-msg" role="status"></div>
           <div id="importPreview" class="preview-wrap"></div>
-          <p class="help">CSV có thể có tiêu đề english,vietnamese. Nếu nghĩa chứa dấu phẩy, đặt nghĩa trong ngoặc kép hoặc chọn dấu phân cách khác. File .xlsx cần lưu thành CSV UTF-8 trước.</p>
+          <p class="help">Tiêu đề tùy chọn: english,vietnamese hoặc english,part_of_speech,phonetic,vietnamese; cũng nhận Từ tiếng Anh, Loại từ, Phiên âm, Nghĩa tiếng Việt. Nếu một ô chứa dấu phân cách, đặt ô đó trong ngoặc kép. File .xlsx cần lưu thành CSV UTF-8 trước. Cặp từ/nghĩa đã có được bỏ qua, không ghi đè loại từ hay phiên âm cũ.</p>
         </section>
         <section aria-labelledby="backupTitle">
           <h2 class="section-title" id="backupTitle">Sao lưu & khôi phục</h2>
-          <p class="section-sub">Một file JSON chứa list, từ vựng, tiến độ ghép cặp, tiến độ ôn tập và toàn bộ lịch sử kết quả.</p>
+          <p class="section-sub">Một file JSON chứa list, từ vựng, loại từ, phiên âm, tiến độ ghép cặp, tiến độ ôn tập và toàn bộ lịch sử kết quả.</p>
           <button type="button" id="downloadBackupBtn" class="btn blue full-width">↓ Tải bản sao lưu</button>
           <div class="divider"></div>
           <div class="field"><label for="restoreFile">Chọn bản sao lưu JSON</label><input id="restoreFile" type="file" accept=".json,application/json" class="input"></div>

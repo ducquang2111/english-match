@@ -340,14 +340,21 @@
   }, 'importMessage'));
   function showImportReport(r) {
     message('importMessage', `${r.new} từ mới · ${r.duplicates} cặp trùng · ${r.errors} dòng lỗi.${r.errors ? ' Sửa hết dòng lỗi trước khi nhập.' : ''}`, !!r.errors);
+    const detected = document.createElement('p'); detected.className = 'help';
+    const formats = [];
+    if (r.formats.two_columns) formats.push(`${r.formats.two_columns} dòng 2 cột`);
+    if (r.formats.four_columns) formats.push(`${r.formats.four_columns} dòng 4 cột`);
+    const delimiterName = ({'\t': 'Tab', '|': '|', ',': 'dấu phẩy', ';': 'dấu chấm phẩy'})[r.delimiter];
+    detected.textContent = `Nhận diện: ${formats.join(' · ') || 'chưa có dòng đúng số cột'} · Phân cách: ${delimiterName}.${r.header_skipped ? ' Đã bỏ dòng tiêu đề.' : ''}`;
     const table = document.createElement('table'), head = table.createTHead().insertRow();
-    ['Dòng', 'Tiếng Anh', 'Tiếng Việt', 'Kết quả'].forEach(text => { const th = document.createElement('th'); th.textContent = text; head.append(th); });
+    table.setAttribute('aria-label', 'Xem trước dữ liệu nhập');
+    ['Dòng', 'Từ tiếng Anh', 'Loại từ', 'Phiên âm', 'Nghĩa tiếng Việt', 'Kết quả'].forEach(text => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = text; head.append(th); });
     const body = table.createTBody();
     [...r.rows.filter(x => x.status === 'error'), ...r.rows.filter(x => x.status !== 'error')].slice(0, 100).forEach(x => {
       const tr = body.insertRow(); tr.className = `status-${x.status}`;
-      [x.line, x.english, x.vietnamese, x.message].forEach(value => { tr.insertCell().textContent = value; });
+      [x.line, x.english, x.part_of_speech || '—', x.phonetic || '—', x.vietnamese, x.message].forEach(value => { tr.insertCell().textContent = value; });
     });
-    $('importPreview').replaceChildren(table);
+    $('importPreview').replaceChildren(detected, table);
     if (r.rows.length > 100) { const p = document.createElement('p'); p.className = 'help'; p.textContent = 'Hiển thị tối đa 100 dòng, ưu tiên dòng lỗi. Các số tổng tính toàn bộ dữ liệu.'; $('importPreview').append(p); }
   }
   $('previewImportBtn').addEventListener('click', e => perform(async () => {

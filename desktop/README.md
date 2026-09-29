@@ -2,23 +2,43 @@
 
 Chuyển từ file `english-match-web-v2(2)(2).zip` được cung cấp ngày 27/09/2026. Giữ 16 từ và List 1, ghép cặp, random không lặp, quản lý từ/list, nhập CSV, lưu vòng học, xuất/khôi phục JSON, flashcard, gõ đáp án, phát âm, ôn từ sai, lịch sử và thống kê.
 
-## Mới trong 1.2.0: Loại từ và phiên âm
+## Mới trong 1.3.0: Nhập từ bằng 2 hoặc 4 cột
+
+- Phần **Nhập & sao lưu** tự nhận diện từng dòng: `từ | nghĩa` hoặc `từ | loại từ | phiên âm | nghĩa`. Có thể trộn cả hai dạng trong cùng lần nhập; dùng cùng một dấu phân cách cho cả nội dung.
+- Hỗ trợ dán từ Excel (Tab), CSV UTF-8, TSV và TXT; nhận dấu `|`, Tab, dấu phẩy hoặc chấm phẩy. Có thể chọn dấu phân cách thủ công khi nội dung khó nhận diện.
+- Loại từ và phiên âm có thể để trống trong dạng 4 cột, nhưng giữ đủ dấu phân cách: `order | | /ˈɔːdə/ | đặt hàng`.
+- Tiêu đề không bắt buộc. Nhận `english,vietnamese` hoặc `english,part_of_speech,phonetic,vietnamese`, và các tên tiếng Việt tương ứng. Nếu đủ tiêu đề hợp lệ, có thể đổi thứ tự cột; dòng không có tiêu đề dùng thứ tự trong mẫu.
+- Bảng xem trước hiển thị đủ từ, loại từ, phiên âm, nghĩa, số dòng và kết quả. Dòng sai số cột hoặc quá dài sẽ được báo lỗi; không nhập một phần khi còn lỗi.
+- Cặp từ/nghĩa đã có được bỏ qua, không ghi đè hai trường cũ. Để sửa từ đã có, dùng **Quản lý từ & list**.
+- JSON giữ đầy đủ hai trường, tiến độ và lịch sử; vẫn dùng định dạng sao lưu 3 tương thích với ứng dụng 1.2.0.
+
+Ví dụ dán cả ba dòng cùng lúc:
+
+```text
+noon | giữa trưa
+provide | v | /prəˈvaɪd/ | cung cấp
+offer | n/v | /ˈɒfə/ | đề nghị, lời đề nghị
+```
+
+Nếu một ô chứa dấu phân cách, đặt ô đó trong ngoặc kép; ví dụ CSV: `offer,n/v,/ˈɒfə/,"đề nghị, lời đề nghị"`. Không tự tách nội dung loại từ/phiên âm đang gõ chung trong ô từ tiếng Anh.
+
+## Loại từ và phiên âm (từ 1.2.0)
 
 - Trong **Quản lý từ & list**, bảng có các cột: Từ tiếng Anh, Loại từ, Phiên âm, Nghĩa tiếng Việt, List và Thao tác.
 - Form thêm/sửa có hai ô không bắt buộc: **Loại từ** (ví dụ `n`, `v`, `adj`, `n/v`) và **Phiên âm** (ví dụ `/ˈɔːdə/`). Nhập tiếng Anh thuần ở ô Từ tiếng Anh, chẳng hạn `order`.
-- Hai thông tin chỉ hiện trong phần quản lý. Ghép cặp vẫn chỉ hiện từ tiếng Anh/nghĩa; flashcard, gõ đáp án và lịch sử cũng không thêm hai thông tin này. Phát âm vẫn đọc từ tiếng Anh.
+- Hai thông tin hiện trong phần quản lý và bảng xem trước nhập dữ liệu. Ghép cặp vẫn chỉ hiện từ tiếng Anh/nghĩa; flashcard, gõ đáp án và lịch sử cũng không thêm hai thông tin này. Phát âm vẫn đọc từ tiếng Anh.
 - Có thể tìm theo loại từ hoặc phiên âm. Sửa hai ô này hoặc chuyển list không xóa giá trị ở ô còn lại. Chỉ sửa loại từ/phiên âm không làm mất vòng học và lịch sử.
 - Các từ đã có được giữ nguyên và hai ô mới để trống. Nếu trước đây bạn nhập `order (v/n) /ˈɔːdə/` vào ô tiếng Anh, bấm Sửa để tách thành `order`, `v/n`, `/ˈɔːdə/`. Ứng dụng không tự đoán hay sửa nội dung từ cũ. Đổi chính từ/nghĩa có thể tạo lại vòng học đang dùng từ đó như trước.
 - Sao lưu JSON mới giữ cả loại từ và phiên âm; định dạng sao lưu là phiên bản 3 để bản ứng dụng cũ không âm thầm làm mất hai cột. Vẫn nhập được các bản sao lưu định dạng 1 và 2; các trường mới sẽ để trống nếu chưa có.
-- Nhập CSV hai cột từ/nghĩa vẫn hoạt động. Bạn có thể bổ sung loại từ và phiên âm trong phần quản lý sau khi nhập.
+- Nhập CSV hai cột từ/nghĩa vẫn hoạt động; từ 1.3.0 có thể nhập cả bốn cột như hướng dẫn trên.
 
 ## Cài và mở
 
 | Máy | File |
 | --- | --- |
-| Windows 10/11, 64-bit Intel/AMD | `English-Match-1.2.0-win-x64.exe` |
-| Mac chip Apple Silicon (M1, M2, M3, M4…); macOS 13 trở lên | `English-Match-1.2.0-mac-arm64.dmg` |
-| Mac chip Intel; macOS 13 trở lên | `English-Match-1.2.0-mac-x64.dmg` |
+| Windows 10/11, 64-bit Intel/AMD | `English-Match-1.3.0-win-x64.exe` |
+| Mac chip Apple Silicon (M1, M2, M3, M4…); macOS 13 trở lên | `English-Match-1.3.0-mac-arm64.dmg` |
+| Mac chip Intel; macOS 13 trở lên | `English-Match-1.3.0-mac-x64.dmg` |
 
 Windows: mở bộ cài, chọn thư mục và hoàn tất. Sau đó mở biểu tượng **English Match** ở Desktop hoặc Start Menu.
 
@@ -26,9 +46,9 @@ Mac: mở DMG, kéo **English Match** vào **Applications**, rồi mở trong Ap
 
 Không cần cài Python, Node.js, trình duyệt hoặc thuê máy chủ. Học được khi tắt mạng. Bộ cài miễn phí chưa có chứng chỉ nhà phát hành thương mại / Apple notarization, nên hệ điều hành có thể hiển thị cảnh báo khi mở lần đầu. Hãy kiểm tra đúng nguồn tải; nếu máy do công ty quản lý chặn cài đặt, liên hệ quản trị viên. Không cần tắt bảo vệ của hệ điều hành.
 
-## Cập nhật từ 1.0.0 hoặc 1.1.0
+## Cập nhật từ các bản trước
 
-Hãy xuất JSON trước khi cập nhật. Thoát ứng dụng cũ, chạy bộ cài 1.2.0 (Mac: thay ứng dụng trong Applications). Dữ liệu vẫn ở cùng thư mục trên máy. Bản mới tự thêm hai cột, giữ kho từ, list, tiến độ và lịch sử cũ. Tiêu đề “English Match 2.2” từng hiển thị là nhãn của giao diện web gốc; số phiên bản ứng dụng desktop được xem tại menu English Match → Về English Match.
+Hãy xuất JSON trước khi cập nhật. Thoát ứng dụng cũ, chạy bộ cài 1.3.0 (Mac: thay ứng dụng trong Applications). Dữ liệu vẫn ở cùng thư mục trên máy. Bản mới tự thêm hai cột, giữ kho từ, list, tiến độ và lịch sử cũ. Tiêu đề “English Match 2.2” từng hiển thị là nhãn của giao diện web gốc; số phiên bản ứng dụng desktop được xem tại menu English Match → Về English Match.
 
 Phát âm sử dụng giọng tiếng Anh được cài trên hệ điều hành. Nếu chưa có giọng, ứng dụng hướng dẫn cài giọng trong Windows/macOS. Chọn giọng cài trên máy để nghe khi offline.
 
