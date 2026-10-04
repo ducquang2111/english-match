@@ -25,7 +25,7 @@ class ImportDetailsTests(unittest.TestCase):
                          ('provide', 'v', '/prəˈvaɪd/', 'cung cấp'))
         self.assertEqual(self.api('GET', '/api/vocabulary?search=simple')['items'][0]['phonetic'], '')
         backup = self.api('GET', '/api/backup')
-        self.assertEqual(backup['version'], 3)
+        self.assertEqual(backup['version'], 4)
         self.api('DELETE', f"/api/vocabulary/{word['id']}")
         preview = self.api('POST', '/api/restore/preview', {'backup': backup})
         self.api('POST', '/api/restore', {'backup': backup, 'token': preview['token']})

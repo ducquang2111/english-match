@@ -118,7 +118,7 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
   const simple=(await api('/api/vocabulary?search=afternoon')).items[0];
   assert.equal(simple.part_of_speech,'');assert.equal(simple.phonetic,'');
   const backup=await api('/api/backup');
-  assert.equal(backup.version,3);assert.equal(backup.vocabulary.length,19);
+  assert.equal(backup.version,4);assert.equal(backup.vocabulary.length,19);
   assert.equal(backup.vocabulary.find(w=>w.english==='provide').phonetic,'/prəˈvaɪd/');
   assert.ok(backup.learning.sessions.some(s=>s.mode==='flashcard'));
   assert.ok(backup.learning.sessions.some(s=>s.mode==='typing'));
@@ -126,7 +126,7 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
   assert.equal(savedWord.part_of_speech,'v/n');assert.equal(savedWord.phonetic,'/ˈɔːrdər/');
   const vocabulary=(await api('/api/vocabulary')).items;
   const cards=await evaluate(`[...document.querySelectorAll('#board .card.english')].map(c=>({id:Number(c.dataset.pairId),text:c.textContent}))`);
-  for(const card of cards)assert.equal(card.text,vocabulary.find(w=>w.id===card.id).english);
+  for(const card of cards){const w=vocabulary.find(w=>w.id===card.id);const pos=(w.part_of_speech||'').trim().replace(/^\((.*)\)$/u,'$1').trim();assert.equal(card.text,w.english+(pos?' ('+pos+')':''));}
   assert.equal(await evaluate(`document.getElementById('reviewView').textContent.includes('/ˈɔːrdər/') || document.getElementById('historyView').textContent.includes('/ˈɔːrdər/')`),false);
   await evaluate(`document.querySelector('[data-view="vocab"]').click()`);
   assert.equal(await evaluate(`document.querySelector('.vocab-row[data-id="${savedWord.id}"] .word-pos').textContent`),'v/n');
@@ -134,8 +134,43 @@ exports.run=async({win,origin,token,dataDir,quit})=>{
   assert.equal((await fetch(origin+'/server.py',{headers:{'X-English-Match-Desktop':token}})).status,404);
   const speech=await evaluate(`({supported:'speechSynthesis' in window,englishVoices:window.speechSynthesis?.getVoices().filter(v=>/^en(?:-|_|$)/i.test(v.lang)).length||0})`);
   assert.equal(speech.supported,true);
+  // Verify the new assets inside the real native bundle and across app restarts.
+  await evaluate(`document.querySelector('[data-view="grammar"]').click()`);
+  await wait(`document.querySelectorAll('.grammar-chapter').length===26`);
+  const catalog=await api('/api/grammar/catalog');
+  assert.equal(catalog.chapters.reduce((n,c)=>n+c.sections.length,0),295);
+  if(stage==='create'){
+    await evaluate(`document.getElementById('grammarComplete').click();document.getElementById('grammarBookmark').click()`);
+    await flush();
+  }
+  const grammar=(await api('/api/grammar/progress')).item;
+  assert.ok(grammar.completed.includes('1.1'));assert.ok(grammar.bookmarks.includes('1.1'));
+  assert.equal(await evaluate(`document.getElementById('grammarComplete').getAttribute('aria-pressed')`),'true');
+  if(stage!=='create'){
+    const selected=await evaluate(`(async()=>{
+      const request=async(url,data,method='POST')=>{const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error(await r.text());return r.json()};
+      const a=(await request('/api/lists',{name:'Native list A'})).item.id;
+      const b=(await request('/api/lists',{name:'Native list B'})).item.id;
+      await request('/api/vocabulary/${savedWord.id}',{list_id:a},'PUT');
+      await request('/api/vocabulary/${imported.id}',{list_id:b},'PUT');
+      return [a,b].join(',');
+    })()`);
+    // Reload fetches changed vocabulary and proves the selector works with packaged JS.
+    await new Promise(resolve=>{wc.once('did-finish-load',resolve);wc.reload();});
+    await wait(`window.Study && document.querySelectorAll('#board .card').length && !document.getElementById('startReviewBtn').disabled`);
+    await evaluate(`window.confirm=()=>true;ListScope.set('gameListSelect',${JSON.stringify(selected)});document.getElementById('gameListSelect').dispatchEvent(new Event('change'))`);
+    await flush();
+    const round=(await api('/api/progress')).item;assert.equal(round.scope,selected);assert.equal(round.words.length,2);
+    const labels=await evaluate(`[...document.querySelectorAll('#board .card.english')].map(c=>c.textContent).sort()`);
+    assert.deepEqual(labels,['order (v/n)','provide (v)']);
+    await evaluate(`document.querySelector('[data-view="review"]').click();ListScope.set('reviewScope',${JSON.stringify(selected)});document.getElementById('reviewWrongOnly').checked=false;document.getElementById('reviewMode').value='flashcard';document.getElementById('startReviewBtn').click()`);
+    await wait(`document.querySelector('#flashCard .study-pos')`);await flush();
+    assert.equal((await api('/api/review/progress')).item.words.length,2);
+    await evaluate(`document.querySelector('[data-view="vocab"]').click();ListScope.set('manageListFilter',${JSON.stringify(selected)});document.getElementById('manageListFilter').dispatchEvent(new Event('change'))`);
+    assert.equal(await evaluate(`document.querySelectorAll('#vocabList .vocab-row').length`),2);
+  }
   const image=await wc.capturePage(),out=process.env.EM_SMOKE_OUTPUT;
-  if(out){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,stage+'.png'),image.toPNG());fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify({ok:true,version:'1.3.0',platform:process.platform,arch:process.arch,stage,words:19,matched:1,wordDetails:true,flexibleImport:true,matchingTextOnly:true,flashcard:true,typing:true,wrongReview:true,history:true,speech,dataDir},null,2));}
+  if(out){fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,stage+'.png'),image.toPNG());fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify({ok:true,version:'1.4.0',platform:process.platform,arch:process.arch,stage,words:19,matched:1,wordDetails:true,flexibleImport:true,matchingPartOfSpeech:true,flashcard:true,typing:true,wrongReview:true,history:true,speech,dataDir},null,2));}
   console.log('NATIVE_DESKTOP_SMOKE_OK '+process.platform+' '+process.arch+' '+stage+' flashcard typing wrong-review history');
   await quit();
 };

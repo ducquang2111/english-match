@@ -23,8 +23,8 @@
     for (let i = result.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [result[i], result[j]] = [result[j], result[i]]; }
     return result;
   }
-  const pool = () => state.vocab.filter(w => state.scope === 'all' || String(w.list_id) === state.scope);
-  const scopeName = () => state.scope === 'all' ? 'Tất cả list' : (state.lists.find(l => String(l.id) === state.scope)?.name || 'List đã chọn');
+  const pool = () => state.vocab.filter(w => ListScope.includes(state.scope, w.list_id));
+  const scopeName = () => ListScope.name(state.scope, state.lists);
   const currentPage = () => state.session?.pageStates[state.session.pageIndex];
   const pageDone = i => state.session.pageStates[i].matched.length === state.session.pages[i].length;
   const allDone = () => !!state.session && state.session.pages.every((_, i) => pageDone(i));
@@ -69,7 +69,7 @@
     await drainSaves();
     if (state.pending !== undefined || state.saveError) throw state.saveError || new Error('Tiến độ chưa được lưu. Hãy thử lại.');
   }
-  window.EnglishMatchDesktop = Object.freeze({ async flush() { await flushSaves(); await window.Study?.flush(); } });
+  window.EnglishMatchDesktop = Object.freeze({ async flush() { await flushSaves(); await window.Study?.flush(); await window.Grammar?.flush(); } });
   $('retrySaveBtn').addEventListener('click', () => { saveLabel('Đang thử lưu...'); drainSaves(); });
   window.addEventListener('beforeunload', event => {
     if (state.pending !== undefined || state.saving) { event.preventDefault(); event.returnValue = ''; }
@@ -103,9 +103,9 @@
   function roundCompatible(s) {
     try {
       if (!s || s.version !== 1 || !Array.isArray(s.words) || !s.words.length) return false;
-      if (s.scope !== 'all' && !state.lists.some(l => String(l.id) === s.scope)) return false;
+      if (!ListScope.valid(s.scope, state.lists)) return false;
       const fresh = new Map(state.vocab.map(w => [w.id, w]));
-      if (!s.words.every(w => fresh.get(w.id)?.english === w.english && fresh.get(w.id)?.vietnamese === w.vietnamese && (s.scope === 'all' || String(fresh.get(w.id).list_id) === s.scope))) return false;
+      if (!s.words.every(w => fresh.get(w.id)?.english === w.english && fresh.get(w.id)?.vietnamese === w.vietnamese && ListScope.includes(s.scope, fresh.get(w.id).list_id))) return false;
       const ids = s.words.map(w => w.id), flat = s.pages.flat();
       if (s.pages.length !== s.pageStates.length || flat.length !== ids.length || new Set(flat).size !== ids.length || !flat.every(id => ids.includes(id))) return false;
       if (!Number.isInteger(s.pageIndex) || !s.pages[s.pageIndex]) return false;
@@ -151,7 +151,7 @@
       const [raw, side] = key.split('-'), id = Number(raw), w = words.get(id), b = document.createElement('button');
       b.type = 'button'; b.className = `card ${side === 'en' ? 'english' : 'vietnamese'}`;
       b.dataset.key = key; b.dataset.pairId = String(id); b.dataset.side = side;
-      b.textContent = side === 'en' ? w.english : w.vietnamese;
+      b.textContent = side === 'en' ? WordDisplay.english({ ...w, part_of_speech: state.vocab.find(fresh => fresh.id === id)?.part_of_speech }) : w.vietnamese;
       b.setAttribute('aria-label', `${side === 'en' ? 'Tiếng Anh' : 'Tiếng Việt'}: ${b.textContent}`);
       if (p.matched.includes(id)) { b.classList.add('matched'); b.disabled = true; b.setAttribute('aria-hidden', 'true'); }
       b.addEventListener('click', () => chooseCard(b)); $('board').append(b);
@@ -200,7 +200,7 @@
     cancelEffects(); currentPage().order = shuffle(currentPage().order); renderGame(); queueSave(); toast('Đã trộn vị trí, giữ nguyên các cặp đã ghép.');
   });
   $('gameListSelect').addEventListener('change', () => {
-    if (state.restoreBusy || !approveReset()) { $('gameListSelect').value = state.scope; return; }
+    if (state.restoreBusy || !state.ready || !approveReset()) { ListScope.set('gameListSelect', state.scope); return; }
     state.scope = $('gameListSelect').value; createRound();
   });
   function fillSelect(id, all = false) {
@@ -210,10 +210,10 @@
     if ([...select.options].some(o => o.value === old)) select.value = old;
   }
   function refreshSelectors() {
-    ['gameListSelect', 'manageListFilter'].forEach(id => fillSelect(id, true));
+    ['gameListSelect', 'manageListFilter'].forEach(id => ListScope.update(id, state.lists));
     ['addListSelect', 'importListSelect', 'editListSelect'].forEach(id => fillSelect(id));
-    if (state.scope !== 'all' && !state.lists.some(l => String(l.id) === state.scope)) state.scope = 'all';
-    $('gameListSelect').value = state.scope;
+    if (state.scope !== 'all') state.scope = ListScope.ids(state.scope).filter(id => state.lists.some(l => String(l.id) === id)).join(',');
+    ListScope.set('gameListSelect', state.scope);
     $('addForm').querySelector('[type="submit"]').disabled = !state.lists.length;
     $('previewImportBtn').disabled = !state.lists.length;
   }
@@ -245,7 +245,7 @@
   }
   function renderVocab() {
     const query = $('searchInput').value.trim().toLocaleLowerCase(), listId = $('manageListFilter').value;
-    const items = state.vocab.filter(w => (!listId || listId === 'all' || String(w.list_id) === listId) &&
+    const items = state.vocab.filter(w => ListScope.includes(listId, w.list_id) &&
       (!query || [w.english, w.vietnamese, w.part_of_speech, w.phonetic, w.list_name].some(x => (x || '').toLocaleLowerCase().includes(query))));
     $('listCount').textContent = `${items.length} từ`; $('vocabList').replaceChildren();
     if (!items.length) { $('vocabList').textContent = 'Không có từ phù hợp.'; return; }
@@ -293,7 +293,7 @@
   document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
     if (state.restoreBusy) return;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
-    ['game', 'review', 'history', 'vocab', 'data'].forEach(view => $(`${view}View`).classList.toggle('hidden', view !== tab.dataset.view));
+    ['game', 'review', 'history', 'vocab', 'data', 'grammar'].forEach(view => $(`${view}View`).classList.toggle('hidden', view !== tab.dataset.view));
   }));
   $('searchInput').addEventListener('input', renderVocab); $('manageListFilter').addEventListener('change', renderVocab);
   $('cancelEditBtn').addEventListener('click', () => $('editDialog').close());
@@ -370,7 +370,7 @@
     message('importMessage', `Đã nhập ${report.new} từ; bỏ qua ${report.duplicates} cặp trùng. Từ mới sẽ có trong vòng tiếp theo.`);
   }, 'importMessage', e.currentTarget).finally(() => { $('applyImportBtn').disabled = true; }));
   $('downloadBackupBtn').addEventListener('click', e => perform(async () => {
-    cancelEffects(); renderGame(); await flushSaves(); await window.Study?.flush();
+    cancelEffects(); renderGame(); await flushSaves(); await window.Study?.flush(); await window.Grammar?.flush();
     const response = await fetch('/api/backup'); if (!response.ok) throw new Error('Không tải được bản sao lưu.');
     const blob = await response.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = `english-match-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -385,21 +385,21 @@
     const result = await api('/api/restore/preview', json('POST', { backup }));
     if ($('restoreFile').files[0] !== file) return;
     restorePreview = { backup, token: result.token };
-    message('restoreMessage', `${result.lists} list · ${result.words} từ · ${result.has_progress ? 'Có' : 'Không có'} tiến độ ghép cặp · ${result.history_count} buổi trong lịch sử. Khôi phục thay thế dữ liệu hiện tại.`);
+    message('restoreMessage', `${result.lists} list · ${result.words} từ · ${result.has_progress ? 'Có' : 'Không có'} tiến độ ghép cặp · ${result.history_count} buổi trong lịch sử · ${result.grammar_completed || 0} mục ngữ pháp đã đọc. Khôi phục thay thế dữ liệu hiện tại.`);
     $('applyRestoreBtn').classList.remove('hidden');
   }, 'restoreMessage', e.currentTarget));
   $('applyRestoreBtn').addEventListener('click', async () => {
     if (!restorePreview || state.restoreBusy || !confirm('Thay thế toàn bộ kho từ, tiến độ và lịch sử bằng bản đã chọn? Một bản database dự phòng sẽ được tạo trước khi thay thế.')) return;
-    state.restoreBusy = true; window.Study?.setBusy(true); $('applyRestoreBtn').disabled = true;
+    state.restoreBusy = true; window.Study?.setBusy(true); window.Grammar?.setBusy(true); $('applyRestoreBtn').disabled = true;
     try {
-      cancelEffects(); await flushSaves(); await window.Study?.flush();
+      cancelEffects(); await flushSaves(); await window.Study?.flush(); await window.Grammar?.flush();
       const result = await api('/api/restore', json('POST', restorePreview));
       try { localStorage.removeItem(CACHE); } catch {}
       state.session = null; state.pending = undefined; state.saveError = null;
-      await initialize(false); await window.Study?.reload(false); restorePreview = null; $('applyRestoreBtn').classList.add('hidden');
+      await initialize(false); await window.Study?.reload(false); await window.Grammar?.reload(false); restorePreview = null; $('applyRestoreBtn').classList.add('hidden');
       message('restoreMessage', `Đã khôi phục. Bản dự phòng: backups/${result.safety_backup}`);
     } catch (e) { message('restoreMessage', e.message, true); }
-    finally { state.restoreBusy = false; window.Study?.setBusy(false); $('applyRestoreBtn').disabled = false; }
+    finally { state.restoreBusy = false; window.Study?.setBusy(false); window.Grammar?.setBusy(false); $('applyRestoreBtn').disabled = false; }
   });
   async function initialize(useCache = true) {
     const [lists, words, progress] = await Promise.all([api('/api/lists'), api('/api/vocabulary'), api('/api/progress')]);

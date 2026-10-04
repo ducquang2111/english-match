@@ -14,6 +14,7 @@ import uuid
 import unicodedata
 from functools import wraps
 from datetime import datetime, timezone
+import grammar_store
 
 
 class AppConnection(sqlite3.Connection):
@@ -491,6 +492,16 @@ def positive_id(value):
     return type(value) is int and 0 < value < 2 ** 53
 
 
+def valid_scope(value):
+    if value == 'all':
+        return True
+    if not isinstance(value, str) or len(value) > 170000:
+        return False
+    ids = value.split(',')
+    return (0 < len(ids) <= 10000 and len(ids) == len(set(ids)) and
+            all(re.fullmatch(r'[1-9][0-9]{0,15}', s) and positive_id(int(s)) for s in ids))
+
+
 def validate_progress(s):
     if s is None:
         return
@@ -498,7 +509,7 @@ def validate_progress(s):
         if not ok:
             raise ValueError('Cấu trúc tiến độ không hợp lệ.')
     check(isinstance(s, dict) and s.get('version') == 1)
-    check(isinstance(s.get('scope'), str) and (s['scope'] == 'all' or s['scope'].isdigit()))
+    check(valid_scope(s.get('scope')))
     check(type(s.get('updatedAt')) is int and s['updatedAt'] >= 0)
     words, pages, states = s.get('words'), s.get('pages'), s.get('pageStates')
     check(isinstance(words, list) and 0 < len(words) <= 10000)
@@ -531,16 +542,16 @@ def ascii_lower(s):
 
 
 def export_backup(con):
-    return {'format': 'english-match-backup', 'version': 3,
+    return {'format': 'english-match-backup', 'version': 4,
             'exported_at': datetime.now(timezone.utc).isoformat(),
             'lists': [dict(r) for r in con.execute('SELECT * FROM vocabulary_lists ORDER BY id')],
             'vocabulary': [dict(r) for r in con.execute('SELECT * FROM vocabulary ORDER BY id')],
-            'progress': get_progress(con), 'learning': learning_export(con)}
+            'progress': get_progress(con), 'learning': learning_export(con), 'grammar': grammar_store.get(con)}
 
 
 def validate_backup(raw):
-    if not isinstance(raw, dict) or raw.get('format') != 'english-match-backup' or raw.get('version') not in (1, 2, 3):
-        raise ValueError('Hãy chọn file JSON sao lưu được xuất từ English Match (định dạng 1, 2 hoặc 3).')
+    if not isinstance(raw, dict) or raw.get('format') != 'english-match-backup' or raw.get('version') not in (1, 2, 3, 4):
+        raise ValueError('Hãy chọn file JSON sao lưu được xuất từ English Match (định dạng 1–4).')
     lists, words = raw.get('lists'), raw.get('vocabulary')
     if not isinstance(lists, list) or not isinstance(words, list) or len(lists) > 10000 or len(words) > 10000:
         raise ValueError('Cấu trúc hoặc số lượng dữ liệu không hợp lệ (tối đa 10.000 từ).')
@@ -570,7 +581,9 @@ def validate_backup(raw):
     match_learning(progress)
     if raw['version'] >= 2 and not isinstance(raw.get('learning'),dict):
         raise ValueError('Bản sao lưu thiếu dữ liệu học tập.')
-    return {'lists': clean_lists, 'vocabulary': clean_words, 'progress': progress, 'learning': validate_learning_backup(raw.get('learning'))}
+    if raw['version'] == 4 and not isinstance(raw.get('grammar'), dict):
+        raise ValueError('Bản sao lưu thiếu tiến độ ngữ pháp.')
+    return {'lists': clean_lists, 'vocabulary': clean_words, 'progress': progress, 'learning': validate_learning_backup(raw.get('learning')), 'grammar': grammar_store.validate(raw.get('grammar') if raw['version'] >= 4 else None)}
 
 
 def backup_token(data):
@@ -751,7 +764,7 @@ def validate_review(s):
         return
     require_learning(isinstance(s, dict) and s.get('version') == 1 and valid_key(s.get('id')))
     require_learning(s.get('mode') in ('flashcard','typing'))
-    require_learning(isinstance(s.get('scope'),str) and (s['scope']=='all' or s['scope'].isdigit()))
+    require_learning(valid_scope(s.get('scope')))
     require_learning(isinstance(s.get('scopeName'),str) and len(s['scopeName']) <= 200)
     require_learning(timestamp(s.get('startedAt')) and timestamp(s.get('updatedAt')))
     require_learning(type(s.get('wrongOnly')) is bool and type(s.get('flipped')) is bool)
@@ -949,6 +962,13 @@ class AppHandler(LegacyHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == '/api/grammar/catalog':
+            self.send_json(grammar_store.catalog())
+            return
+        if path == '/api/grammar/progress':
+            with db_connect() as con:
+                self.send_json({'database_id': database_id(con), 'item': grammar_store.get(con)})
+            return
         if learning_get(self, path, parse_qs(urlparse(self.path).query)):
             return
         if path == '/api/progress':
@@ -987,7 +1007,7 @@ class AppHandler(LegacyHandler):
             clean = validate_backup(data.get('backup'))
             token = backup_token(clean)
             if path.endswith('/preview'):
-                self.send_json({'token': token, 'lists': len(clean['lists']), 'words': len(clean['vocabulary']), 'has_progress': clean['progress'] is not None, 'history_count': len(clean['learning']['sessions'])})
+                self.send_json({'token': token, 'lists': len(clean['lists']), 'words': len(clean['vocabulary']), 'has_progress': clean['progress'] is not None, 'history_count': len(clean['learning']['sessions']), 'grammar_completed': len(clean['grammar']['completed'])})
                 return
             if data.get('token') != token:
                 raise ValueError('Nội dung đã thay đổi. Hãy kiểm tra bản sao lưu lại.')
@@ -995,6 +1015,7 @@ class AppHandler(LegacyHandler):
             with db_connect() as con:
                 con.execute('BEGIN IMMEDIATE')
                 restore_learning(con, clean['learning'])
+                grammar_store.put(con, clean['grammar'])
                 con.execute('DELETE FROM vocabulary')
                 con.execute('DELETE FROM vocabulary_lists')
                 con.executemany('INSERT INTO vocabulary_lists(id,name,created_at) VALUES(:id,:name,:created_at)', clean['lists'])
@@ -1011,14 +1032,19 @@ class AppHandler(LegacyHandler):
     def do_PUT(self):
         path = urlparse(self.path).path
         match = re.fullmatch(r'/api/lists/(\d+)', path)
-        if path not in ('/api/progress','/api/review/progress') and not match:
+        if path not in ('/api/progress','/api/review/progress','/api/grammar/progress') and not match:
             return super().do_PUT()
         data = self.read_json()
         try:
             if data is None:
                 raise ValueError('JSON không hợp lệ.')
             with db_connect() as con:
-                if path in ('/api/progress','/api/review/progress'):
+                if path == '/api/grammar/progress':
+                    if data.get('database_id') != database_id(con):
+                        self.send_json({'error': 'Dữ liệu vừa được khôi phục. Hãy tải lại trang.'}, 409)
+                        return
+                    grammar_store.put(con, data.get('item'))
+                elif path in ('/api/progress','/api/review/progress'):
                     item=data.get('item')
                     if path=='/api/progress':
                         validate_progress(item)
@@ -1057,14 +1083,14 @@ class AppHandler(LegacyHandler):
         return super().do_DELETE()
 
     def serve_static(self, path):
-        allowed = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/review.js': 'review.js'}
+        allowed = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/review.js': 'review.js', '/list-picker.js': 'list-picker.js', '/grammar.js': 'grammar.js', '/learning.css': 'learning.css'}
         if path not in allowed or not (ROOT / allowed[path]).is_file():
             self.send_json({'error': 'Không tìm thấy tài nguyên.'}, 404)
             return
         p = ROOT / allowed[path]
         body = p.read_bytes()
         self.send_response(200)
-        self.send_header('Content-Type', 'text/html; charset=utf-8' if p.suffix == '.html' else 'application/javascript; charset=utf-8')
+        self.send_header('Content-Type', {'.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript'}[p.suffix] + '; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-cache')
         self.send_header('X-Content-Type-Options', 'nosniff')

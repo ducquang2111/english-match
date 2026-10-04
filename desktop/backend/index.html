@@ -267,17 +267,19 @@
     @media(max-width:920px) { .review-layout { grid-template-columns:1fr; } }
     @media(max-width:680px) { .stats-grid { grid-template-columns:1fr 1fr; } .tab { flex:1 1 42%; padding:10px 8px; font-size:13px; } .review-controls { grid-template-columns:1fr; } .study-card { min-height:225px; padding:20px; } .review-layout .game-panel { padding:16px; } .week-grid { gap:3px; } .day-cell { padding:10px 1px; font-size:10px; } .metric { padding:12px; } }
   </style>
+  <link rel="stylesheet" href="/learning.css">
 </head>
 <body>
   <main class="app">
     <header class="topbar">
       <div class="brand">
         <h1>English Match</h1>
-        <p>Ghép cặp · Ghi nhớ · Luyện gõ · Theo dõi tiến bộ</p>
+        <p>Từ vựng · Ngữ pháp · Luyện tập mỗi ngày</p>
       </div>
       <nav class="tabs" aria-label="Chức năng">
         <button class="tab active" data-view="game" type="button">Ghép cặp</button>
         <button class="tab" data-view="review" type="button">Ôn tập</button>
+        <button class="tab" data-view="grammar" type="button">Ngữ pháp</button>
         <button class="tab" data-view="history" type="button">Lịch sử & thống kê</button>
         <button class="tab" data-view="vocab" type="button">Quản lý từ & list</button><button class="tab" data-view="data" type="button">Nhập & sao lưu</button>
       </nav>
@@ -354,6 +356,24 @@
       </div>
     </section>
 
+    <section id="grammarView" class="view hidden" aria-labelledby="grammarHeading">
+      <div class="grammar-heading"><div><h2 id="grammarHeading">Ngữ pháp tiếng Anh</h2><p class="small-muted">Từ nền tảng đến nâng cao · Đọc và tra cứu khi không có mạng</p></div><button id="grammarAbout" class="btn secondary" type="button">Hướng dẫn & nguồn tham khảo</button></div>
+      <div class="status-line"><span id="grammarTotal" class="pill primary">26 chương · 295 mục</span><span id="grammarSave" class="pill" role="status">Sẵn sàng</span><button id="grammarRetry" class="text-btn hidden" type="button">Thử lại</button></div>
+      <div class="grammar-layout">
+        <aside class="grammar-nav" aria-label="Mục lục ngữ pháp">
+          <label for="grammarSearch" class="select-label">Tìm trong lý thuyết</label><input id="grammarSearch" class="input" type="search" placeholder="Ví dụ: câu điều kiện, present…">
+          <label for="grammarFilter" class="select-label">Hiển thị</label><select id="grammarFilter" class="select"><option value="all">Tất cả mục</option><option value="unread">Chưa đọc</option><option value="bookmarks">Đã lưu xem lại</option></select>
+          <p id="grammarResults" class="help" role="status"></p><nav id="grammarIndex" class="grammar-index" aria-label="Các chương và mục"></nav>
+        </aside>
+        <article class="grammar-reader" id="grammarReader">
+          <p id="grammarChapterLabel" class="small-muted"></p><label for="grammarSectionSelect" class="select-label">Chuyển mục trong chương</label><select id="grammarSectionSelect" class="select"></select>
+          <h3 id="grammarTitle" tabindex="-1">Đang mở lý thuyết…</h3><div id="grammarBody" class="grammar-body"></div>
+          <div class="grammar-actions"><button id="grammarComplete" type="button" class="btn blue" aria-pressed="false" disabled>Đánh dấu đã đọc</button><button id="grammarBookmark" type="button" class="btn secondary" aria-pressed="false" disabled>☆ Lưu để xem lại</button></div>
+          <div class="grammar-pagination"><button id="grammarPrev" type="button" class="btn secondary" disabled>← Mục trước</button><span id="grammarPosition" class="small-muted"></span><button id="grammarNext" type="button" class="btn blue" disabled>Mục tiếp →</button></div>
+        </article>
+      </div>
+    </section>
+
     <section id="historyView" class="view hidden">
       <section class="vocab-panel">
         <div class="section-toolbar"><div><h2 class="section-title">Lịch sử & thống kê</h2><p class="section-sub">Theo dõi kết quả từ các buổi học đã lưu.</p></div><div class="row-actions"><button class="btn secondary" id="refreshHistoryBtn" type="button">Làm mới</button><button class="btn blue" id="reviewMistakesBtn" type="button">Ôn từ sai</button></div></div>
@@ -398,7 +418,7 @@
             <div class="divider"></div>
 
             <h2 class="section-title">Thêm từ vựng mới</h2>
-            <p class="section-sub">Từ được lưu trên máy. Loại từ và phiên âm chỉ hiển thị trong mục quản lý, không hiện khi học.</p>
+            <p class="section-sub">Loại từ hiện khi ghép cặp, lật thẻ và gõ đáp án. Phiên âm dùng để tra cứu trong phần quản lý.</p>
             <form id="addForm">
               <div class="field">
                 <label for="englishInput">Từ tiếng Anh</label>
@@ -515,7 +535,10 @@
     </form>
   </dialog>
   <dialog id="sessionDialog" aria-labelledby="sessionTitle"><h2 id="sessionTitle">Chi tiết buổi học</h2><p id="sessionSummary" class="help"></p><div id="sessionEvents" class="history-table"></div><div class="dialog-actions"><button class="btn secondary" type="button" id="closeSessionBtn">Đóng</button></div></dialog>
+  <dialog id="grammarAboutDialog" aria-labelledby="grammarAboutTitle"><h2 id="grammarAboutTitle">Cách học và nguồn tham khảo</h2><div id="grammarAboutText"></div><div class="dialog-actions"><button id="grammarAboutClose" type="button" class="btn secondary">Đóng</button></div></dialog>
+  <script src="/list-picker.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/review.js" defer></script>
+  <script src="/grammar.js" defer></script>
 </body>
 </html>

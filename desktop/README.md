@@ -2,7 +2,15 @@
 
 Chuyển từ file `english-match-web-v2(2)(2).zip` được cung cấp ngày 27/09/2026. Giữ 16 từ và List 1, ghép cặp, random không lặp, quản lý từ/list, nhập CSV, lưu vòng học, xuất/khôi phục JSON, flashcard, gõ đáp án, phát âm, ôn từ sai, lịch sử và thống kê.
 
-## Mới trong 1.3.0: Nhập từ bằng 2 hoặc 4 cột
+## Mới trong 1.4.0
+
+- **Ngữ pháp:** đọc ngoại tuyến đủ 26 chương và 295 mục; tìm nội dung có/không dấu, đánh dấu đã đọc, lưu mục để xem lại, mở lại đúng vị trí học. Công thức, ví dụ và bảng tra cứu được đưa vào giao diện đọc riêng.
+- **Loại từ:** hiện trên cả hai mặt flashcard và thẻ gợi ý khi gõ; ghép cặp hiện `provide (v)`. Từ chưa có loại từ không hiện ngoặc rỗng. Chấm bài gõ và phát âm chỉ dùng từ tiếng Anh. Phiên âm vẫn ở phần quản lý/xem trước nhập.
+- **Chọn nhiều list:** mở bộ chọn, đánh dấu các list rồi bấm **Áp dụng**. Có Chọn tất cả, Bỏ chọn và tìm tên list. Hỗ trợ ghép cặp, flashcard, gõ đáp án, ôn từ sai và lọc kho từ. Phần ôn tập áp dụng nhóm đã chọn khi bắt đầu buổi mới.
+- Sao lưu **định dạng 4** giữ cả tiến độ ngữ pháp và nhóm list của buổi học. Cần ứng dụng 1.4.0 trở lên để đọc bản sao lưu mới; vẫn khôi phục được định dạng 1, 2, 3.
+- Tài liệu ngữ pháp được đóng gói cùng ứng dụng. Các file tài liệu gốc không cần có trên máy. Bản này bổ sung lý thuyết và theo dõi việc đọc, chưa có bộ sinh bài tập ngữ pháp tự động.
+
+## Nhập từ bằng 2 hoặc 4 cột
 
 - Phần **Nhập & sao lưu** tự nhận diện từng dòng: `từ | nghĩa` hoặc `từ | loại từ | phiên âm | nghĩa`. Có thể trộn cả hai dạng trong cùng lần nhập; dùng cùng một dấu phân cách cho cả nội dung.
 - Hỗ trợ dán từ Excel (Tab), CSV UTF-8, TSV và TXT; nhận dấu `|`, Tab, dấu phẩy hoặc chấm phẩy. Có thể chọn dấu phân cách thủ công khi nội dung khó nhận diện.
@@ -10,7 +18,7 @@ Chuyển từ file `english-match-web-v2(2)(2).zip` được cung cấp ngày 27
 - Tiêu đề không bắt buộc. Nhận `english,vietnamese` hoặc `english,part_of_speech,phonetic,vietnamese`, và các tên tiếng Việt tương ứng. Nếu đủ tiêu đề hợp lệ, có thể đổi thứ tự cột; dòng không có tiêu đề dùng thứ tự trong mẫu.
 - Bảng xem trước hiển thị đủ từ, loại từ, phiên âm, nghĩa, số dòng và kết quả. Dòng sai số cột hoặc quá dài sẽ được báo lỗi; không nhập một phần khi còn lỗi.
 - Cặp từ/nghĩa đã có được bỏ qua, không ghi đè hai trường cũ. Để sửa từ đã có, dùng **Quản lý từ & list**.
-- JSON giữ đầy đủ hai trường, tiến độ và lịch sử; vẫn dùng định dạng sao lưu 3 tương thích với ứng dụng 1.2.0.
+- JSON giữ đầy đủ hai trường, tiến độ học, lịch sử và tiến độ ngữ pháp.
 
 Ví dụ dán cả ba dòng cùng lúc:
 
@@ -26,19 +34,19 @@ Nếu một ô chứa dấu phân cách, đặt ô đó trong ngoặc kép; ví 
 
 - Trong **Quản lý từ & list**, bảng có các cột: Từ tiếng Anh, Loại từ, Phiên âm, Nghĩa tiếng Việt, List và Thao tác.
 - Form thêm/sửa có hai ô không bắt buộc: **Loại từ** (ví dụ `n`, `v`, `adj`, `n/v`) và **Phiên âm** (ví dụ `/ˈɔːdə/`). Nhập tiếng Anh thuần ở ô Từ tiếng Anh, chẳng hạn `order`.
-- Hai thông tin hiện trong phần quản lý và bảng xem trước nhập dữ liệu. Ghép cặp vẫn chỉ hiện từ tiếng Anh/nghĩa; flashcard, gõ đáp án và lịch sử cũng không thêm hai thông tin này. Phát âm vẫn đọc từ tiếng Anh.
+- Loại từ hiện trong quản lý, xem trước nhập, flashcard, gõ đáp án và sau từ tiếng Anh ở ghép cặp. Phiên âm chỉ hiện trong quản lý và xem trước nhập. Phát âm vẫn đọc từ tiếng Anh.
 - Có thể tìm theo loại từ hoặc phiên âm. Sửa hai ô này hoặc chuyển list không xóa giá trị ở ô còn lại. Chỉ sửa loại từ/phiên âm không làm mất vòng học và lịch sử.
 - Các từ đã có được giữ nguyên và hai ô mới để trống. Nếu trước đây bạn nhập `order (v/n) /ˈɔːdə/` vào ô tiếng Anh, bấm Sửa để tách thành `order`, `v/n`, `/ˈɔːdə/`. Ứng dụng không tự đoán hay sửa nội dung từ cũ. Đổi chính từ/nghĩa có thể tạo lại vòng học đang dùng từ đó như trước.
-- Sao lưu JSON mới giữ cả loại từ và phiên âm; định dạng sao lưu là phiên bản 3 để bản ứng dụng cũ không âm thầm làm mất hai cột. Vẫn nhập được các bản sao lưu định dạng 1 và 2; các trường mới sẽ để trống nếu chưa có.
+- Sao lưu định dạng 4 giữ loại từ, phiên âm và tiến độ ngữ pháp. Nhập được định dạng 1–3; các thông tin chưa có sẽ để trống.
 - Nhập CSV hai cột từ/nghĩa vẫn hoạt động; từ 1.3.0 có thể nhập cả bốn cột như hướng dẫn trên.
 
 ## Cài và mở
 
 | Máy | File |
 | --- | --- |
-| Windows 10/11, 64-bit Intel/AMD | `English-Match-1.3.0-win-x64.exe` |
-| Mac chip Apple Silicon (M1, M2, M3, M4…); macOS 13 trở lên | `English-Match-1.3.0-mac-arm64.dmg` |
-| Mac chip Intel; macOS 13 trở lên | `English-Match-1.3.0-mac-x64.dmg` |
+| Windows 10/11, 64-bit Intel/AMD | `English-Match-1.4.0-win-x64.exe` |
+| Mac chip Apple Silicon (M1, M2, M3, M4…); macOS 13 trở lên | `English-Match-1.4.0-mac-arm64.dmg` |
+| Mac chip Intel; macOS 13 trở lên | `English-Match-1.4.0-mac-x64.dmg` |
 
 Windows: mở bộ cài, chọn thư mục và hoàn tất. Sau đó mở biểu tượng **English Match** ở Desktop hoặc Start Menu.
 
@@ -48,7 +56,7 @@ Không cần cài Python, Node.js, trình duyệt hoặc thuê máy chủ. Học
 
 ## Cập nhật từ các bản trước
 
-Hãy xuất JSON trước khi cập nhật. Thoát ứng dụng cũ, chạy bộ cài 1.3.0 (Mac: thay ứng dụng trong Applications). Dữ liệu vẫn ở cùng thư mục trên máy. Bản mới tự thêm hai cột, giữ kho từ, list, tiến độ và lịch sử cũ. Tiêu đề “English Match 2.2” từng hiển thị là nhãn của giao diện web gốc; số phiên bản ứng dụng desktop được xem tại menu English Match → Về English Match.
+Hãy xuất JSON trước khi cập nhật. Thoát ứng dụng cũ, chạy bộ cài 1.4.0 (Mac: thay ứng dụng trong Applications). Dữ liệu vẫn ở cùng thư mục trên máy. Bản mới tự thêm hai cột, giữ kho từ, list, tiến độ và lịch sử cũ. Tiêu đề “English Match 2.2” từng hiển thị là nhãn của giao diện web gốc; số phiên bản ứng dụng desktop được xem tại menu English Match → Về English Match.
 
 Phát âm sử dụng giọng tiếng Anh được cài trên hệ điều hành. Nếu chưa có giọng, ứng dụng hướng dẫn cài giọng trong Windows/macOS. Chọn giọng cài trên máy để nghe khi offline.
 

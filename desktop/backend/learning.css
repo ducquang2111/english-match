@@ -1,0 +1,47 @@
+.topbar { align-items: flex-start; flex-direction: column; }
+.tabs { flex: 0 1 auto; width: 100%; justify-content: flex-start; }
+.list-picker { position: relative; min-width: 220px; flex: 1 1 220px; max-width: 100%; }
+.list-picker summary { cursor: pointer; font-weight: 650; overflow-wrap: anywhere; }
+.list-picker[open] { z-index: 8; }
+.list-picker-panel { position: absolute; left: 0; top: calc(100% + 6px); width: min(380px, 82vw); background: white; border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: 0 12px 36px #24304724; }
+.list-picker-options { max-height: 260px; overflow-y: auto; margin: 8px 0; }
+.list-picker-option { display: flex !important; align-items: flex-start; gap: 9px; padding: 9px 5px; font-weight: 500 !important; cursor: pointer; margin: 0 !important; }
+.list-picker-option:hover { background: var(--blue-soft); }
+.list-picker-option input { flex: 0 0 auto; width: 18px; height: 18px; accent-color: var(--blue); margin: 1px 0; }
+.list-picker-option span { overflow-wrap: anywhere; }
+.study-pos { display: inline-block; color: #345899; background: var(--blue-soft); padding: 6px 13px; border-radius: 999px; font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
+.grammar-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.grammar-heading h2 { margin: 0 0 5px; font-size: 25px; }
+.grammar-heading p { margin: 0; }
+.grammar-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; margin-top: 18px; align-items: start; }
+.grammar-nav, .grammar-reader { background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+.grammar-nav { padding: 16px; position: sticky; top: 12px; }
+.grammar-nav .input, .grammar-nav .select { margin-top: 7px; }
+.grammar-nav .select-label { margin-top: 12px; }
+.grammar-index { max-height: 65vh; overflow-y: auto; padding-right: 4px; }
+.grammar-chapter { border-bottom: 1px solid var(--line); padding: 4px 0; }
+.grammar-chapter > summary { padding: 12px 4px; cursor: pointer; font-weight: 750; line-height: 1.4; }
+.grammar-chapter > summary span { display: block; margin: 4px 0 0 16px; font-weight: 400; }
+.grammar-section-link { width: 100%; border: 0; border-radius: 8px; background: transparent; text-align: left; color: var(--text); padding: 10px 12px; line-height: 1.45; display: block; }
+.grammar-section-link:hover, .grammar-section-link[aria-current] { color: #2854a6; background: var(--blue-soft); }
+.grammar-section-link[aria-current] { font-weight: 750; box-shadow: inset 3px 0 var(--blue); }
+.grammar-read-mark { color: #147f49; margin-left: 6px; }
+.grammar-bookmark-mark { color: #8a6000; margin-left: 6px; }
+.grammar-reader { padding: 28px; min-width: 0; }
+.grammar-reader h3 { font-size: 26px; line-height: 1.35; margin: 12px 0 20px; outline: none; }
+.grammar-reader h3:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
+.grammar-body { font-size: 17px; line-height: 1.85; overflow-wrap: anywhere; }
+.grammar-body p { margin: 0 0 18px; white-space: pre-line; }
+.grammar-body li { margin-bottom: 9px; }
+.grammar-body strong { color: #244977; }
+.grammar-table { width: 100%; overflow-x: auto; margin: 20px 0; border: 1px solid var(--line); border-radius: 10px; }
+.grammar-table table { min-width: 440px; font-size: 15px; line-height: 1.6; }
+.grammar-table th, .grammar-table td { padding: 12px; }
+.grammar-table th { position: static; }
+.grammar-actions { border-top: 1px solid var(--line); padding-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+.grammar-actions [aria-pressed="true"] { background: var(--green-soft); color: #14683c; }
+.grammar-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
+#grammarAboutDialog { width: min(840px, calc(100% - 28px)); }
+#grammarAboutText { max-height: 65vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; font-size: 15px; }
+@media(max-width:920px) { .grammar-layout { grid-template-columns: 250px minmax(0, 1fr); gap: 12px; } .grammar-reader { padding: 20px; } }
+@media(max-width:680px) { .tabs { justify-content: flex-start; } .grammar-layout { grid-template-columns: 1fr; } .grammar-nav { position: static; } .grammar-index { max-height: 240px; } .grammar-reader { padding: 18px; } .grammar-reader h3 { font-size: 23px; } .grammar-pagination { flex-wrap: wrap; } .grammar-body { font-size: 16px; } }

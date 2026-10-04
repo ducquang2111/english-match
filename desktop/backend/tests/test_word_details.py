@@ -41,7 +41,7 @@ class WordDetailsTests(unittest.TestCase):
     def test_backup_roundtrip_and_legacy_backups(self):
         word = self.add_word()
         backup = self.api('GET', '/api/backup')
-        self.assertEqual(backup['version'], 3)
+        self.assertEqual(backup['version'], 4)
         self.api('PUT', f"/api/vocabulary/{word['id']}", {'phonetic': ''})
         preview = self.api('POST', '/api/restore/preview', {'backup': backup})
         self.api('POST', '/api/restore', {'backup': backup, 'token': preview['token']})

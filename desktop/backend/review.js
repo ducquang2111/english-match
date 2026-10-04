@@ -46,16 +46,14 @@
   function compatible(s) {
     try {
       if (!s || s.version !== 1 || !['flashcard', 'typing'].includes(s.mode) || !s.words.length || !Array.isArray(s.results)) return false;
-      if (s.scope !== 'all' && !state.lists.some(l => String(l.id) === s.scope)) return false;
+      if (!ListScope.valid(s.scope, state.lists)) return false;
       const words = new Map(state.words.map(w => [w.id, w]));
       return Number.isInteger(s.index) && s.index >= 0 && s.index <= s.words.length && [s.index, s.index + 1].includes(s.results.length) &&
-        s.words.every(w => words.get(w.id)?.english === w.english && words.get(w.id)?.vietnamese === w.vietnamese && (s.scope === 'all' || String(words.get(w.id).list_id) === s.scope));
+        s.words.every(w => words.get(w.id)?.english === w.english && words.get(w.id)?.vietnamese === w.vietnamese && ListScope.includes(s.scope, words.get(w.id).list_id));
     } catch { return false; }
   }
   function fillScope() {
-    const old = $('reviewScope').value; $('reviewScope').replaceChildren(new Option('Tất cả list', 'all'));
-    state.lists.forEach(l => $('reviewScope').add(new Option(`${l.name} (${l.word_count})`, String(l.id))));
-    if ([...$('reviewScope').options].some(o => o.value === old)) $('reviewScope').value = old;
+    ListScope.update('reviewScope', state.lists);
   }
   async function reload(useCache = true) {
     const epoch = ++state.loadEpoch; state.ready = false; $('startReviewBtn').disabled = true;
@@ -68,7 +66,7 @@
     } else { try { localStorage.removeItem(CACHE); } catch {} state.pending = undefined; state.error = null; }
     state.session = compatible(restored) ? restored : null; state.ready = true;
     fillScope();
-    if (state.session) { $('reviewMode').value = state.session.mode; $('reviewScope').value = state.session.scope; $('reviewWrongOnly').checked = state.session.wrongOnly; }
+    if (state.session) { $('reviewMode').value = state.session.mode; ListScope.set('reviewScope', state.session.scope); $('reviewWrongOnly').checked = state.session.wrongOnly; }
     $('startReviewBtn').disabled = state.busy; render();
     if (restored) { queueSave(); note('reviewMessage', state.session ? 'Đã khôi phục buổi ôn. Bạn có thể học tiếp.' : 'Một từ đã thay đổi. Hãy bắt đầu buổi mới; lịch sử cũ vẫn được giữ.'); }
     else saveLabel('Sẵn sàng');
@@ -79,7 +77,8 @@
     try {
       const [words, lists] = await Promise.all([api('/api/vocabulary'), api('/api/lists')]);
       state.words = words.items; state.lists = lists.items; fillScope(); state.stats = null;
-      if (state.session && !compatible(state.session)) { state.session = null; queueSave(); render(); note('reviewMessage', 'Từ trong buổi ôn đã thay đổi. Hãy bắt đầu buổi mới.'); }
+      if (state.session && !compatible(state.session)) { state.session = null; queueSave(); note('reviewMessage', 'Từ trong buổi ôn đã thay đổi. Hãy bắt đầu buổi mới.'); }
+      render();
     } catch (e) { note('reviewMessage', e.message, true); }
   }
   async function start() {
@@ -92,12 +91,12 @@
       state.words = vocab.items; state.stats = stats;
       const scope = $('reviewScope').value, wrongOnly = $('reviewWrongOnly').checked;
       const wrong = new Set(stats.words.filter(w => w.needs_review).map(w => w.id));
-      const words = state.words.filter(w => (scope === 'all' || String(w.list_id) === scope) && (!wrongOnly || wrong.has(w.id)));
+      const words = state.words.filter(w => ListScope.includes(scope, w.list_id) && (!wrongOnly || wrong.has(w.id)));
       if (!words.length) { note('reviewMessage', wrongOnly ? 'Không có từ cần ôn trong phạm vi này. Bạn có thể bỏ chọn “Chỉ ôn từ sai / chưa nhớ”.' : 'Phạm vi này chưa có từ. Hãy thêm từ trong Quản lý từ & list.'); return; }
       if (words.length > 10000) throw new Error('Buổi ôn tối đa 10.000 từ. Hãy chọn một list nhỏ hơn.');
       const now = Date.now();
       state.session = { version: 1, id: crypto.randomUUID(), mode: $('reviewMode').value, scope,
-        scopeName: scope === 'all' ? 'Tất cả list' : (state.lists.find(l => String(l.id) === scope)?.name || 'List đã chọn'),
+        scopeName: ListScope.name(scope, state.lists),
         wrongOnly, startedAt: now, updatedAt: now, words: shuffle(words.map(({ id, english, vietnamese, list_id }) => ({ id, english, vietnamese, list_id }))), index: 0, results: [], flipped: false };
       window.speechSynthesis?.cancel(); note('reviewMessage', ''); queueSave(); render();
     } catch (e) { note('reviewMessage', e.message, true); }
@@ -121,10 +120,12 @@
       const actions = el('div', undefined, 'study-actions'); actions.append(button('Học buổi mới', start, 'btn blue'), button('Ôn từ sai', () => { $('reviewWrongOnly').checked = true; start(); })); box.append(actions); area.append(box); return;
     }
     const word = s.words[s.index], result = s.results[s.index];
+    const pos = WordDisplay.part(state.words.find(w => w.id === word.id));
     if (s.mode === 'flashcard') {
       const card = button('', () => { if (state.busy) return; s.flipped = !s.flipped; queueSave(); render(); }, 'study-card'); card.id = 'flashCard'; card.setAttribute('aria-label', s.flipped ? 'Mặt nghĩa. Bấm để xem từ tiếng Anh' : 'Mặt từ tiếng Anh. Bấm để xem nghĩa');
       card.append(el('span', s.flipped ? 'NGHĨA TIẾNG VIỆT' : 'TỪ TIẾNG ANH', 'small-muted'), el('span', s.flipped ? word.vietnamese : word.english, 'main-word'));
       if (s.flipped) card.append(el('span', word.english, 'translation'));
+      if (pos) card.append(el('span', `Loại từ: ${pos}`, 'study-pos'));
       card.append(el('span', 'Bấm vào thẻ để lật', 'small-muted'));
       const actions = el('div', undefined, 'study-actions');
       const rate = correct => { if (state.busy || !s.flipped) return; s.results.push({ correct, answer: '', at: Date.now() }); s.index++; s.flipped = false; window.speechSynthesis?.cancel(); queueSave(); render(); };
@@ -132,6 +133,7 @@
       actions.append(forgot, remembered); area.append(card, actions, speechButton(word.english));
     } else {
       const cue = el('div', undefined, 'study-card'); cue.append(el('span', 'GÕ TỪ TIẾNG ANH CÓ NGHĨA', 'small-muted'), el('span', word.vietnamese, 'main-word'));
+      if (pos) cue.append(el('span', `Loại từ: ${pos}`, 'study-pos'));
       const form = el('form', undefined, 'answer-form'); form.id = 'typingForm';
       const label = el('label', 'Đáp án của bạn', 'select-label'); label.htmlFor = 'typingAnswer';
       const input = el('input', undefined, 'input'); input.id = 'typingAnswer'; input.autocomplete = 'off'; input.spellcheck = false; input.setAttribute('autocapitalize', 'none'); input.maxLength = 1000; input.required = true; input.readOnly = !!result; input.value = result?.answer || '';
@@ -230,7 +232,7 @@
     } catch (e) { note('historyMessage', e.message, true); }
   }
   $('startReviewBtn').addEventListener('click', start); $('retryReviewSave').addEventListener('click', () => drain());
-  $('reviewMistakesBtn').addEventListener('click', () => { document.querySelector('[data-view="review"]').click(); $('reviewWrongOnly').checked = true; $('reviewScope').value = 'all'; $('reviewMode').value = 'typing'; start(); });
+  $('reviewMistakesBtn').addEventListener('click', () => { document.querySelector('[data-view="review"]').click(); $('reviewWrongOnly').checked = true; $('reviewMode').value = 'typing'; start(); });
   $('refreshHistoryBtn').addEventListener('click', showHistory);
   $('historyMode').addEventListener('change', () => { state.offset = 0; showHistory(); });
   $('historyPrev').addEventListener('click', () => { state.offset = Math.max(0, state.offset - 20); showHistory(); });

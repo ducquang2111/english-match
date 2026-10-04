@@ -88,13 +88,13 @@ function buildMenu() {
   const dataTab = () => win?.webContents.executeJavaScript(`document.querySelector('[data-view="data"]')?.click()`).catch(log);
   const template = [
     {label:'English Match', submenu:[
-      {label:'Về English Match', click:() => dialog.showMessageBox(win, {type:'info', message:'English Match ' + app.getVersion(), detail:'Ứng dụng học từ vựng offline, chuyển từ file web bạn cung cấp.\nDữ liệu được lưu riêng trên máy này.\nChọn Nhập & sao lưu để chuyển dữ liệu sang máy khác.'})},
+      {label:'Về English Match', click:() => dialog.showMessageBox(win, {type:'info', message:'English Match ' + app.getVersion(), detail:'Ứng dụng học từ vựng và ngữ pháp offline.\nDữ liệu được lưu riêng trên máy này.\nChọn Nhập & sao lưu để chuyển dữ liệu sang máy khác.'})},
       {type:'separator'}, {label:'Thoát', accelerator:'CmdOrCtrl+Q', click:quit}
     ]},
     {label:'Chỉnh sửa', submenu:[{role:'undo', label:'Hoàn tác'}, {role:'redo', label:'Làm lại'}, {type:'separator'}, {role:'cut', label:'Cắt'}, {role:'copy', label:'Sao chép'}, {role:'paste', label:'Dán'}, {role:'selectAll', label:'Chọn tất cả'}]},
     {label:'Hiển thị', submenu:[{role:'reload', label:'Tải lại giao diện'}, {role:'resetZoom', label:'Kích thước gốc'}, {role:'zoomIn', label:'Phóng to'}, {role:'zoomOut', label:'Thu nhỏ'}, {role:'togglefullscreen', label:'Toàn màn hình'}]},
     {label:'Dữ liệu', submenu:[{label:'Nhập & sao lưu…', click:dataTab}, {label:'Mở thư mục dữ liệu', click:() => shell.openPath(dataDir).then(error => {if(error) log(error);})}]},
-    {label:'Trợ giúp', submenu:[{label:'Cách sử dụng', click:() => dialog.showMessageBox(win, {type:'info', message:'Học từ vựng trên máy', detail:'1. Mở Ghép cặp để ghép từ tiếng Anh và nghĩa.\n2. Ôn tập: lật flashcard, gõ đáp án và nghe phát âm.\n3. Lịch sử & thống kê: xem kết quả và ôn từ sai.\n4. Quản lý từ & list: thêm/sửa từ, loại từ và phiên âm.\n5. Nhập & sao lưu: nhập CSV hoặc xuất JSON.\nỨng dụng tự lưu tiến độ. Bạn có thể tắt mạng khi học.\nTrước khi chuyển máy, xuất bản sao lưu JSON rồi khôi phục trên máy mới.'})}]}
+    {label:'Trợ giúp', submenu:[{label:'Cách sử dụng', click:() => dialog.showMessageBox(win, {type:'info', message:'Học từ vựng trên máy', detail:'1. Mở Ghép cặp để ghép từ tiếng Anh và nghĩa.\n2. Ôn tập: lật flashcard, gõ đáp án và nghe phát âm.\n3. Lịch sử & thống kê: xem kết quả và ôn từ sai.\n4. Quản lý từ & list: thêm/sửa từ, loại từ và phiên âm.\n5. Ngữ pháp: đọc 26 chương, tìm kiến thức và đánh dấu đã đọc.\n6. Nhập & sao lưu: nhập CSV hoặc xuất JSON.\nỨng dụng tự lưu tiến độ. Bạn có thể tắt mạng khi học.\nTrước khi chuyển máy, xuất bản sao lưu JSON rồi khôi phục trên máy mới.'})}]}
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
